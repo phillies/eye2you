@@ -7,7 +7,6 @@ import io
 import numpy as np
 import torch
 import torch.nn as nn
-#import torchvision.models as models
 import eye2you.model_wrapper as models
 import torchvision.transforms as transforms
 
@@ -172,9 +171,9 @@ class RetinaCheckerPandas():
         if self.config is None:
             raise ValueError('self.config cannot be None')
 
-        self.model_name = self.config['network'].get('model', 'resnet18')
+        self.model_name = self.config['network'].get('model', 'inception_v3')
         self.optimizer_name = self.config['network'].get('optimizer', 'Adam')
-        self.criterion_name = self.config['network'].get('criterion', 'CrossEntropy')
+        self.criterion_name = self.config['network'].get('criterion', 'BCEWithLogitsLoss')
         self.train_root = self.config['files'].get('train root', './train')
         self.train_file = self.config['files'].get('train file', 'labels.csv')
         self.test_root = self.config['files'].get('test root', None)
@@ -191,7 +190,7 @@ class RetinaCheckerPandas():
 
         self.model_pretrained = self.config['network'].getboolean('pretrained', False)
 
-        self.learning_rate = self.config['hyperparameter'].getfloat('learning rate', 0.01)
+        self.learning_rate = self.config['hyperparameter'].getfloat('learning rate', 0.001)
         self.learning_rate_decay_step_size = self.config['hyperparameter'].getfloat('lr decay step', 50)
         self.learning_rate_decay_gamma = self.config['hyperparameter'].getfloat('lr decay gamma', 0.5)
 
@@ -291,10 +290,10 @@ class RetinaCheckerPandas():
         No specific sampler for test data.
         """
 
-        batch_size = self.config['hyperparameter'].getint('batch size', 10)
+        batch_size = self.config['hyperparameter'].getint('batch size', 32)
         
         if not self.config['input'].getboolean('evaluation only', False):
-            num_samples = self.config['files'].getint('samples', 1000)
+            num_samples = self.config['files'].getint('samples', 6400)
         
             train_sampler = self._get_sampler( self.train_dataset, num_samples )
 
@@ -312,16 +311,16 @@ class RetinaCheckerPandas():
                                                 sampler=test_sampler,
                                                 num_workers=num_workers)
 
-    def save_state( self, train_loss, train_accuracy, test_loss, test_accuracy, test_confusion, filename ):
-        """Save the current state of the model including history of training and test performance
+    def save_state( self, filename, train_loss=None, train_accuracy=None, test_loss=None, test_accuracy=None, test_confusion=None ):
+        """Save the current state of the model including history of training and test performance (optionally)
         
         Arguments:
+            filename {string} -- target filename        
             train_loss {torch.Array} -- tensor of training losses
             train_accuracy {torch.Array} -- tensor of training accuracy
             test_loss {torch.Array} -- tensor of test losses
             test_accuracy {torch.Array} -- tensor of test accuracy
             test_confusion {torch.Array} -- tensor of confusion matrices
-            filename {string} -- target filename
         """
         self._update_config_string()
 
@@ -425,7 +424,7 @@ class RetinaCheckerPandas():
 
     def _get_training_transform( self, normalize_factors=None ):
 
-        rotation_angle = self.config['transform'].getint('rotation angle', 180)
+        rotation_angle = self.config['transform'].getint('rotation angle', 0)
         rotation = transforms.RandomRotation(rotation_angle)
         
         brightness = self.config['transform'].getfloat('brightness', 0)

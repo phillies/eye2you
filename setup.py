@@ -5,7 +5,7 @@ def readme():
         return f.read()
 
 setup(name='eye2you',
-    version='0.0.dev1',
+    version='0.0.dev2',
     description='fundus image analysis',
     long_description=readme(),
     classifiers=[

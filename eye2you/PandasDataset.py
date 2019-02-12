@@ -133,20 +133,22 @@ class PandasDataset(torch.utils.data.Dataset):
         (as of scikit 0.20).
         
         Keyword Arguments:
-            test_size {float} -- If float, should be between 0.0 and 1.0 and represent the proportion 
+            test_size {float/int} -- If float, should be between 0.0 and 1.0 and represent the proportion 
             of the dataset to include in the test split. If int, represents the absolute number of 
             test samples. If None, the value is set to the complement of the train size. By default, 
             the value is set to 0.1. The default will change in version 0.21. It will remain 0.1 only 
             if train_size is unspecified, otherwise it will complement the specified train_size. (default: {0.1})
 
-            train_size {[type]} -- If float, should be between 0.0 and 1.0 and represent the proportion 
+            train_size {float/int} -- If float, should be between 0.0 and 1.0 and represent the proportion 
             of the dataset to include in the train split. If int, represents the absolute number of 
             train samples. If None, the value is automatically set to the complement of the test size.
             (default: {None})
 
-            random_state {[type]} -- If int, random_state is the seed used by the random number generator; 
+            random_state {int/RandomState} -- If int, random_state is the seed used by the random number generator; 
             If RandomState instance, random_state is the random number generator; If None, the random 
             number generator is the RandomState instance used by np.random. (default: {None})
+
+            return_indices {list} -- List where the indices of the split will be appended. (default: {None})
         """
 
         sss = sklearn.model_selection.StratifiedShuffleSplit(n_splits=1, test_size=test_size, train_size=train_size, random_state=random_state)

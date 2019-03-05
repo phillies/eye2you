@@ -4,7 +4,7 @@ import torch
 import torchvision
 from PIL import Image
 
-from .RetinaCheckerPandas import RetinaCheckerPandas as RetinaChecker
+from .RetinaChecker import RetinaChecker
 
 def PIL_to_cv2(img):
     return np.array(img)

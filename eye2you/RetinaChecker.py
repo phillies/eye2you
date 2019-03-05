@@ -31,7 +31,7 @@ def all_or_nothing_performance( labels, outputs ):
     num_correct = float(perf.sum())
     return num_correct
 
-class RetinaCheckerPandas():
+class RetinaChecker():
     """Deep learning model
     """
 

@@ -1,10 +1,14 @@
-import pytest
-import numpy as np
-from eye2you.meter_functions import AccuracyMeter, AverageMeter
-from eye2you import model_wrapper as models
-
 import os
 import pathlib
+import configparser
+
+import numpy as np
+import pytest
+
+import eye2you
+import eye2you.make_default_config
+from eye2you import models
+from eye2you.meter_functions import AccuracyMeter, AverageMeter
 
 LOCAL_DIR = pathlib.Path(os.path.dirname(os.path.realpath(__file__)))
 RANDOM_SEED = 1337
@@ -38,12 +42,27 @@ def test_AverageMeter(sample_data):
     assert abs(meter.avg - sample_data.mean()) < EPSILON
 
 def test_inception():
-    inc = models.inception_v3_s()
-    assert inc is not None
     inc = models.inception_v3()
     assert inc is not None
+
+def test_inception_v3_s():
+    inc = models.inception_v3_s()
+    assert not inc is None
+    inc = None
+
+    with pytest.warns(Warning):
+        inc = models.inception_v3_s(pretrained=True)
+        assert not inc is None
+
+def test_inception_v3_xs():
     inc = models.inception_v3_xs()
-    assert inc is not None
+    assert not inc is None
+    inc = None
+
+    with pytest.warns(Warning):
+        inc = models.inception_v3_xs(pretrained=True)
+        assert not inc is None
+
 
 def test_resnet():
     res = models.resnet18()
@@ -57,20 +76,43 @@ def test_resnet():
     res = models.resnet152()
     assert res is not None
 
-def test_vgg():
-    vgg = models.vgg11()
-    assert vgg is not None
-    vgg = models.vgg13()
-    assert vgg is not None
-    vgg = models.vgg16()
-    assert vgg is not None
-    vgg = models.vgg19()
-    assert vgg is not None
-    vgg = models.vgg11_bn()
-    assert vgg is not None
-    vgg = models.vgg13_bn()
-    assert vgg is not None
-    vgg = models.vgg16_bn()
-    assert vgg is not None
-    vgg = models.vgg19_bn()
-    assert vgg is not None
+
+def test_performance_meters(data_labels, data_outputs):
+    num_correct_all = ((data_outputs > 0).numpy() == data_labels.numpy()).all(axis=1).sum()
+    num_correct_single = ((data_outputs > 0).numpy() == data_labels.numpy()).sum(axis=0)
+    
+    fake_labels = data_labels - 0.5
+    num_correct = eye2you.meter_functions.all_or_nothing_performance(data_labels, fake_labels)
+    assert num_correct == len(data_labels)
+
+    num_correct = eye2you.meter_functions.all_or_nothing_performance(data_labels, data_outputs)
+    assert num_correct >= 0
+    assert num_correct <= len(data_labels)
+    assert num_correct == num_correct_all
+
+    for ii in range(data_labels.size()[1]):
+        num_correct = eye2you.meter_functions.single_output_performance(data_labels, fake_labels, ii)
+        assert num_correct == len(data_labels)
+        num_correct = eye2you.meter_functions.single_output_performance(data_labels, data_outputs, ii)
+        assert num_correct >= 0
+        assert num_correct <= len(data_labels)
+        assert num_correct == num_correct_single[ii]
+
+
+def test_default_config(tmp_path):
+    config = eye2you.make_default_config.get_config()
+
+    assert not config is None
+    assert isinstance(config, configparser.ConfigParser)
+
+    filename = tmp_path / 'test.cfg'
+    assert not os.path.exists(filename)
+
+    eye2you.make_default_config.save_config(filename)
+    assert os.path.isfile(filename)
+
+    filename = tmp_path / 'test2.cfg'
+    assert not os.path.exists(filename)
+
+    eye2you.make_default_config.save_config(filename, config)
+    assert os.path.isfile(filename)

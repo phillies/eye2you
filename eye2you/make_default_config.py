@@ -64,15 +64,13 @@ def get_config():
 
     return config
 
-def save_default_config( filename = 'default.cfg' ):
+def save_config( filename = 'default.cfg', config = None ):
     """Stores the default configuration file
     
     Keyword Arguments:
         filename {str} -- target configuration file (default: {'default.cfg'})
     """
-    config = get_config()
+    if config is None:
+        config = get_config()
     with open(filename, 'w') as fopen:
         config.write(fopen)
-
-if __name__ == '__main__':
-    save_default_config('default.cfg')

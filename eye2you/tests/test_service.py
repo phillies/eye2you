@@ -1,7 +1,10 @@
+import os
+
 import pytest
 import configparser
 import numpy as np
 from PIL import Image
+
 from eye2you import Service
 from eye2you import RetinaChecker
 
@@ -18,19 +21,11 @@ train root = ./images/data/
 [output]
 [input]'''
 
-def test_classify():
-    pass
-
-def test_cam():
-    pass
-
-def test_contour():
-    pass
-
-def test_create_service(tmp_path):
+@pytest.fixture(scope='module')
+def retina_checker(example_config):
     # Reading configuration file
     config = configparser.ConfigParser()
-    config.read_string(CONFIG_STRING)
+    config.read_string(example_config)
 
     # create the checker class and initialize internal variables
     rc = RetinaChecker()
@@ -40,8 +35,36 @@ def test_create_service(tmp_path):
     rc.initialize_model()
     rc.initialize_criterion()
     rc.initialize_optimizer()
+    return rc
 
-    rc.save_state(tmp_path / 'tmpmodel.ckpt')
+@pytest.fixture(scope='module')
+def checkpoint_file(tmp_path, retina_checker):
+    filename = tmp_path / 'tmpmodel.ckpt'
+    retina_checker.save_state(filename)
+    return filename
 
-    service = Service(tmp_path / 'tmpmodel.ckpt')    
+@pytest.fixture(scope='module')
+def default_service(checkpoint_file):
+    service = Service(checkpoint_file)
+    return service
+
+def test_create_service(checkpoint_file):
+    with pytest.raises(ValueError):
+        service = Service(None)
+
+    with pytest.raises(ValueError):
+        service = Service('None')
+
+    service = Service(checkpoint_file)    
     assert service is not None
+
+def test_classify():
+    pass
+
+def test_cam():
+    pass
+
+def test_contour():
+    pass
+
+

@@ -22,8 +22,8 @@ def cv2_to_PIL(img, min_val=None, max_val=None):
 
 
 features_blobs = []
-def hook_feature(module, input, output):
-    features_blobs.append(output.data.cpu().numpy())
+def hook_feature(module_unsused, input_unused, out):
+    features_blobs.append(out.data.cpu().numpy())
 
 def returnCAM(feature_conv, weight_softmax, class_idx, size_upsample = (256, 256), inter=cv2.INTER_LINEAR):
     # generate the class activation maps upsample to 256x256

@@ -1,35 +1,18 @@
-import configparser
+import pathlib
 import os
 import warnings
 import json
 import io
+import configparser
 
 import numpy as np
 import torch
 import torch.nn as nn
-import eye2you.model_wrapper as models
+import eye2you.models as models
 import torchvision.transforms as transforms
 
 from .PandasDataset import PandasDataset
-from .meter_functions import AccuracyMeter, AverageMeter
-
-def single_output_performance( labels, outputs, feature_number=5 ):
-    if isinstance(outputs, tuple):
-        predicted = nn.Sigmoid()(outputs[0])
-    else:
-        predicted = nn.Sigmoid()(outputs)
-    perf2 = (predicted[:,feature_number].round()==labels[:,feature_number])
-    num_correct = float(perf2.sum())
-    return num_correct
-
-def all_or_nothing_performance( labels, outputs ):
-    if isinstance(outputs, tuple):
-        predicted = nn.Sigmoid()(outputs[0])
-    else:
-        predicted = nn.Sigmoid()(outputs)
-    perf = (predicted.round()==labels).sum(1) == labels.size()[1]
-    num_correct = float(perf.sum())
-    return num_correct
+from .meter_functions import AccuracyMeter, AverageMeter, all_or_nothing_performance
 
 class RetinaChecker():
     """Deep learning model
@@ -59,7 +42,6 @@ class RetinaChecker():
         self.train_dataset = None
         self.test_dataset = None
         self.split_indices = None
-        self.num_classes = None
         self.classes = None
         self.normalize_mean = None
         self.normalize_std = None
@@ -78,6 +60,10 @@ class RetinaChecker():
         self.learning_rate_decay_step_size = None
 
         self.initialized = False
+
+    @property
+    def num_classes(self):
+        return len(self.classes)
 
     def __str__( self ):
         desc = 'RetinaChecker\n'
@@ -140,7 +126,7 @@ class RetinaChecker():
         if config is None:
             raise ValueError('config cannot be None')
 
-        elif isinstance(config, str):
+        elif isinstance(config, str) or isinstance(config, pathlib.Path):
             if not os.path.isfile(config):
                 raise ValueError('File {} does not exist (or is not a file)'.format(config))
             self.config = configparser.ConfigParser()
@@ -152,7 +138,6 @@ class RetinaChecker():
                     if 'config' in ckpt.keys():
                         self.config.read_string(ckpt['config'])
                         self.classes = ckpt['classes']
-                        self.num_classes = len(self.classes)
                     else:
                         raise ValueError('Checkpoint has no config stored')
                 except Exception:
@@ -161,6 +146,7 @@ class RetinaChecker():
         
         elif isinstance(config, configparser.ConfigParser):
             self.config = config
+            self.classes = {0:'undefined'}
 
         else:
             raise ValueError('Could not recognize config type')
@@ -267,8 +253,7 @@ class RetinaChecker():
                 self.train_dataset, self.test_dataset = dataset.split(test_size=test_size, return_indices=self.split_indices)
                 self.train_dataset.transform = train_transform
                 self.test_dataset.transform = test_transform
-                #self.train_dataset.dump('train.csv')
-                #self.test_dataset.dump('test.csv')
+
             else:
                 self.train_dataset = PandasDataset(source=self.train_file, mode='csv',
                                                             root=self.train_root,
@@ -278,7 +263,6 @@ class RetinaChecker():
                                                             transform=test_transform, target_transform=None)
 
         self.classes = self.test_dataset.class_to_idx
-        self.num_classes = len(self.classes)
 
     
     def create_dataloader( self, num_workers=8 ):

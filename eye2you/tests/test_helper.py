@@ -34,9 +34,24 @@ def test_AccuracyMeter(sample_data):
     for ii in range(len(accuracy_data)):
         meter.update(accuracy_data[ii], PSEUDO_SAMPLE_SIZE)
     assert abs(meter.avg - accuracy_data.sum()/sample_data.size/PSEUDO_SAMPLE_SIZE) < EPSILON
+    meter.reset()
+    assert meter.avg==0
+    assert meter.count==0
+    assert meter.sum==0
+    for ii in range(len(accuracy_data)):
+        meter.update(accuracy_data[ii], PSEUDO_SAMPLE_SIZE)
+    assert abs(meter.avg - accuracy_data.sum()/sample_data.size/PSEUDO_SAMPLE_SIZE) < EPSILON
 
 def test_AverageMeter(sample_data):
     meter = AverageMeter()
+    for ii in range(len(sample_data)):
+        meter.update(sample_data[ii])
+    assert abs(meter.avg - sample_data.mean()) < EPSILON
+    meter.reset()
+    assert meter.avg==0
+    assert meter.val==0
+    assert meter.count==0
+    assert meter.sum==0
     for ii in range(len(sample_data)):
         meter.update(sample_data[ii])
     assert abs(meter.avg - sample_data.mean()) < EPSILON
@@ -94,6 +109,27 @@ def test_performance_meters(data_labels, data_outputs):
         num_correct = eye2you.meter_functions.single_output_performance(data_labels, fake_labels, ii)
         assert num_correct == len(data_labels)
         num_correct = eye2you.meter_functions.single_output_performance(data_labels, data_outputs, ii)
+        assert num_correct >= 0
+        assert num_correct <= len(data_labels)
+        assert num_correct == num_correct_single[ii]
+
+def test_performance_meters_tuple(data_labels, data_outputs):
+    num_correct_all = ((data_outputs > 0).numpy() == data_labels.numpy()).all(axis=1).sum()
+    num_correct_single = ((data_outputs > 0).numpy() == data_labels.numpy()).sum(axis=0)
+    
+    fake_labels = data_labels - 0.5
+    num_correct = eye2you.meter_functions.all_or_nothing_performance(data_labels, (fake_labels, 0))
+    assert num_correct == len(data_labels)
+
+    num_correct = eye2you.meter_functions.all_or_nothing_performance(data_labels, (data_outputs, 0))
+    assert num_correct >= 0
+    assert num_correct <= len(data_labels)
+    assert num_correct == num_correct_all
+
+    for ii in range(data_labels.size()[1]):
+        num_correct = eye2you.meter_functions.single_output_performance(data_labels, (fake_labels, 0), ii)
+        assert num_correct == len(data_labels)
+        num_correct = eye2you.meter_functions.single_output_performance(data_labels, (data_outputs, 0), ii)
         assert num_correct >= 0
         assert num_correct <= len(data_labels)
         assert num_correct == num_correct_single[ii]

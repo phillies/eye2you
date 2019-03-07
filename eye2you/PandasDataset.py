@@ -7,74 +7,8 @@ import torch
 import torch.utils.data
 from PIL import Image
 import sklearn.model_selection
+from .io_helper import pil_loader, IMG_EXTENSIONS, find_classes, make_dataset
 
-# Functions partially copied from torchvision
-
-IMG_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif']
-
-def pil_loader(path):
-    with open(path, 'rb') as f:
-        img = Image.open(f)
-        return img.convert('RGB')
-
-def make_dataset(directory, class_to_idx, extensions):
-    images = []
-    directory = os.path.expanduser(directory)
-    for target in sorted(class_to_idx.keys()):
-        d = os.path.join(directory, target)
-        if not os.path.isdir(d):
-            continue
-
-        for root, _, fnames in sorted(os.walk(d)):
-            for fname in sorted(fnames):
-                if has_file_allowed_extension(fname, extensions):
-                    path = os.path.join(root, fname)
-                    item = (path, class_to_idx[target])
-                    images.append(item)
-
-    return images
-
-def get_image_files(directory, class_index, extensions):
-    images = []
-    d = os.path.expanduser(directory)
-    for root, _, fnames in sorted(os.walk(d)):
-        for fname in sorted(fnames):
-            if has_file_allowed_extension(fname, extensions):
-                path = os.path.join(root, fname)
-                item = (path, class_index)
-                images.append(item)
-
-    return images
-
-def has_file_allowed_extension(filename, extensions):
-    """Checks if a file is an allowed extension.
-    Args:
-        filename (string): path to a file
-        extensions (iterable of strings): extensions to consider (lowercase)
-    Returns:
-        bool: True if the filename ends with one of given extensions
-    """
-    filename_lower = filename.lower()
-    return any(filename_lower.endswith(ext) for ext in extensions)
-
-def find_classes(directory):
-    """
-    Finds the class folders in a dataset.
-    Args:
-        directory (string): Root directory path.
-    Returns:
-        tuple: (classes, class_to_idx) where classes are relative to (directiry), and class_to_idx is a dictionary.
-    Ensures:
-        No class is a subdirectory of another.
-    """
-    if sys.version_info >= (3, 5):
-        # Faster and available in Python 3.5 and above
-        classes = [d.name for d in os.scandir(directory) if d.is_dir()]
-    else:
-        classes = [d for d in os.listdir(directory) if os.path.isdir(os.path.join(directory, d))]
-    classes.sort()
-    class_to_idx = {classes[i]: i for i in range(len(classes))}
-    return classes, class_to_idx
 
 class PandasDataset(torch.utils.data.Dataset):
     """[summary]
@@ -104,7 +38,9 @@ class PandasDataset(torch.utils.data.Dataset):
             self.csv_file = source
         elif mode == 'ImageFolder':
             classes, class_to_idx = find_classes(root)
-            samples = make_dataset(root, class_to_idx, extensions)
+            images = make_dataset(root, class_to_idx, extensions)
+            samples = pd.DataFrame.from_dict({item[0]: item[1] for item in images}, orient='index', columns=['class_id'])
+            samples.index.name = 'filename'
         elif mode == 'pandas':
             samples = source
             classes = samples.columns
@@ -178,20 +114,25 @@ class PandasDataset(torch.utils.data.Dataset):
             raise ValueError('target_transform does not match')
         elif self.root != other.root:
             if align_root:
-                prefix = os.path.commonprefix([self.root, other.root])
+                prefix = os.path.commonpath([self.root, other.root])
                 if prefix == '': #if there is no common prefix
                     self_index_prefix = self.root
                     other_index_prefix = other.root
                 else:
                     self_index_prefix = os.path.relpath(self.root, prefix)
                     other_index_prefix = os.path.relpath(other.root, prefix)
-                self.samples.index = [self_index_prefix+idx for idx in self.samples.index]
+                self.samples.index = [os.path.join( prefix,             # new root
+                                                    self_index_prefix,  # relative path between old root and new root
+                                                    os.path.relpath(idx, self.root)) for idx in self.samples.index] # base without old root
+
                 other = other.clone()
-                other.samples.index = [other_index_prefix+idx for idx in other.samples.index]
+                other.samples.index = [os.path.join(    prefix,
+                                                        other_index_prefix, 
+                                                        os.path.relpath(idx, other.root)) for idx in other.samples.index]
                 self.root = prefix
             else:
                 raise ValueError('root does not match')
-        self.samples.append(other.samples)
+        self.samples = self.samples.append(other.samples)
         self.refresh()
 
     def append_csv(self, source, root=None, nan_replace=None):
@@ -223,7 +164,9 @@ class PandasDataset(torch.utils.data.Dataset):
         return data
 
     def dump(self, filename):
-        self.samples.to_csv(filename, sep=',', index_label=self.samples.index.name)
+        samples_dump = self.samples.copy(deep=True)
+        samples_dump.index = [os.path.relpath(idx, self.root).replace('\\', '/') for idx in samples_dump.index]
+        samples_dump.to_csv(filename, sep=',', index_label=self.samples.index.name)
 
     def __getitem__(self, index):
         """
@@ -239,10 +182,10 @@ class PandasDataset(torch.utils.data.Dataset):
             if not index in self.filenames:
                 raise IndexError('Given index', index, 'not in sample index', self.filenames)
             path = index
-            target = self.targets[index]
+            target = self.samples.loc[index].values.astype(np.float32)
         elif isinstance(index, torch.Tensor):
-            path = self.filenames[index.item()]
-            target = self.targets[index.item()]
+            path = self.filenames[int(index.item())]
+            target = self.targets[int(index.item())]
         else:
             raise IndexError('Given index', index, 'not an integer nor in sample index', self.filenames)
 

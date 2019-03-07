@@ -1,5 +1,5 @@
-filename,class1,class2
-img0.png,0,1
-img1.png,1,0
-img2.png,0,1
-img3.png,1,0
+filename,classA,classB
+classA/img0.jpg,1,0
+classA/img1.jpg,1,0
+classB/img2.jpg,0,1
+classB/img3.jpg,0,1

@@ -38,8 +38,9 @@ def retina_checker(example_config):
     return rc
 
 @pytest.fixture(scope='module')
-def checkpoint_file(tmp_path, retina_checker):
-    filename = tmp_path / 'tmpmodel.ckpt'
+def checkpoint_file(tmp_path_factory, retina_checker):
+    model_path = tmp_path_factory.mktemp(str(tmp_path_factory.getbasetemp()))
+    filename = model_path / 'tmpmodel.ckpt'
     retina_checker.save_state(filename)
     return filename
 
@@ -55,16 +56,16 @@ def test_create_service(checkpoint_file):
     with pytest.raises(ValueError):
         service = Service('None')
 
-    service = Service(checkpoint_file)    
+    service = Service(checkpoint_file)
     assert service is not None
 
 def test_classify():
-    pass
+    assert False #TODO: implement me
 
 def test_cam():
-    pass
+    assert False #TODO: implement me
 
 def test_contour():
-    pass
+    assert False #TODO: implement me
 
 

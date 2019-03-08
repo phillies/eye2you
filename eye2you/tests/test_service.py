@@ -8,19 +8,6 @@ from PIL import Image
 from eye2you import Service
 from eye2you import RetinaChecker
 
-CONFIG_STRING = '''[network]
-model = inception_v3
-
-[hyperparameter]
-
-[files]
-train file = ./images/label.csv
-train root = ./images/data/
-
-[transform]
-[output]
-[input]'''
-
 @pytest.fixture(scope='module')
 def retina_checker(example_config):
     # Reading configuration file
@@ -36,13 +23,6 @@ def retina_checker(example_config):
     rc.initialize_criterion()
     rc.initialize_optimizer()
     return rc
-
-@pytest.fixture(scope='module')
-def checkpoint_file(tmp_path_factory, retina_checker):
-    model_path = tmp_path_factory.mktemp(str(tmp_path_factory.getbasetemp()))
-    filename = model_path / 'tmpmodel.ckpt'
-    retina_checker.save_state(filename)
-    return filename
 
 @pytest.fixture(scope='module')
 def default_service(checkpoint_file):

@@ -1,6 +1,8 @@
 import pytest
 import numpy as np
 import torch
+import configparser
+from eye2you import RetinaChecker
 
 
 @pytest.fixture(scope='module')
@@ -26,3 +28,26 @@ def data_labels():
 @pytest.fixture
 def data_outputs():
     return torch.Tensor(np.random.randn(100,3))
+
+@pytest.fixture(scope='module')
+def retina_checker(example_config):
+    # Reading configuration file
+    config = configparser.ConfigParser()
+    config.read_string(example_config)
+
+    # create the checker class and initialize internal variables
+    rc = RetinaChecker()
+    rc.initialize(config)
+
+    # Initialize the model
+    rc.initialize_model()
+    rc.initialize_criterion()
+    rc.initialize_optimizer()
+    return rc
+
+@pytest.fixture(scope='module')
+def checkpoint_file(tmp_path_factory, retina_checker):
+    model_path = tmp_path_factory.mktemp(str(tmp_path_factory.getbasetemp()))
+    filename = model_path / 'tmpmodel.ckpt'
+    retina_checker.save_state(filename)
+    return filename

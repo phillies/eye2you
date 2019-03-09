@@ -265,13 +265,17 @@ class RetinaChecker():
         self.classes = self.test_dataset.class_to_idx
 
     
-    def create_dataloader( self, num_workers=8 ):
+    def create_dataloader( self, num_workers=8, sampling_relevance=None ):
         """Generates the dataloader (and their respective samplers) for
         training and test data from the training and test data sets.
         Sampler for training data is an unbiased sampler for all classes
         in the training set, i.e. even if the class distribution in the
         data set is biased, all classes are equally contained in the sampling.
         No specific sampler for test data.
+        
+        Keyword Arguments:
+            num_workers {int} -- [description] (default: {8})
+            sampling_relevance {[type]} -- [description] (default: {None})
         """
 
         batch_size = self.config['hyperparameter'].getint('batch size', 32)
@@ -279,7 +283,7 @@ class RetinaChecker():
         if not self.config['input'].getboolean('evaluation only', False):
             num_samples = self.config['files'].getint('samples', 6400)
         
-            train_sampler = self._get_sampler( self.train_dataset, num_samples )
+            train_sampler = self._get_sampler( self.train_dataset, num_samples, sampling_relevance )
 
             self.train_loader = torch.utils.data.DataLoader(dataset=self.train_dataset,
                                                     batch_size=batch_size,
@@ -569,7 +573,7 @@ class RetinaChecker():
         return losses, accuracy, confusion
 
 
-    def _get_sampler( self, dataset, num_samples, relevant_slice=range(5) ):
+    def _get_sampler( self, dataset, num_samples, relevant_slice=None ):
         '''The distribution of samples in training and test data is not equal, i.e.
         the normal class is over represented. To get an unbiased sample (for example with 5
         classes each class should make up for about 20% of the samples) we calculate the 
@@ -580,11 +584,16 @@ class RetinaChecker():
         Arguments:
             dataset {torch.util.data.Dataset} -- the dataset to sample from
             num_samples {int} -- number of samples to be drawn bei the sampler
+            relevant_slices {tuple} -- tuple of dimensions on which the distribution should
+            be caculated, e.g. only on dimensions (0,1) of a 3 dimensional set.
 
         Returns:
             torch.util.data.Sampler -- Sampler object from which patches for the training
             or evaluation can be drawn
         '''
+        if relevant_slice is None:
+            relevant_slice = range(self.num_classes)
+        
         class_distribution = np.vstack([s for s in dataset.targets]).astype(np.int)[:,relevant_slice]
         weights = np.zeros(len(relevant_slice))
         for ii in range(len(relevant_slice)):

@@ -45,13 +45,16 @@ def returnCAM(feature_conv, weight_softmax, class_idx, size_upsample = (256, 256
 
 class Service():
 
-    def __init__(self, checkpoint):
+    def __init__(self, checkpoint=None):
         self.retina_checker = None
         self.checkpoint = checkpoint
         self.transform = None
         self.model_image_size = None
         self.test_image_size_overscaling = None
+        if checkpoint is not None:
+            self.initialize()
 
+    def initialize(self):
         self.retina_checker = RetinaChecker()
         self.retina_checker.initialize(self.checkpoint)
         self.retina_checker.initialize_model()

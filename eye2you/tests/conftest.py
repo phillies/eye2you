@@ -47,7 +47,7 @@ def retina_checker(example_config):
 
 @pytest.fixture(scope='module')
 def checkpoint_file(tmp_path_factory, retina_checker):
-    model_path = tmp_path_factory.mktemp(str(tmp_path_factory.getbasetemp()))
+    model_path = tmp_path_factory.mktemp('ckpt')
     filename = model_path / 'tmpmodel.ckpt'
     retina_checker.save_state(filename)
     return filename

@@ -524,11 +524,13 @@ class RetinaChecker():
         return losses, accuracy   
 
 
-    def validate(self, test_loader = None, evaluate_performance=all_or_nothing_performance, confusion_matrix_label=5):
+    def validate(self, test_loader = None, evaluate_performance=all_or_nothing_performance, confusion_matrix_label=None):
         '''Evaluates the model given the criterion and the data in test_loader
         
         Arguments:
-            test_loader {torch.utils.data.DataLoader} -- contains the data for training, if None takes internal test_loader     
+            test_loader {torch.utils.data.DataLoader} -- contains the data for training, if None takes internal test_loader  
+            evaluate_performance {function} -- evaluation function for the accuracy of the output (default: function with correct only if all labels are correct)
+            confusion_matrix_label {int} -- on which dimension of the output should the confusion matrix be calculated. Takes 5 or the highest dimension, whichever is smaller {default: None}   
         
         Returns:
             AverageMeter -- training loss
@@ -541,6 +543,9 @@ class RetinaChecker():
 
         if test_loader is None:
             test_loader = self.test_loader
+
+        if confusion_matrix_label is None:
+            confusion_matrix_label = min(self.num_classes-1, 5)
 
         self.model.eval()  # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)
         with torch.no_grad():

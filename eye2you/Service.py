@@ -22,7 +22,7 @@ def cv2_to_PIL(img, min_val=None, max_val=None):
 
 
 features_blobs = []
-def hook_feature(module_unsused, input_unused, out):
+def hook_feature(_module, _input, out):
     features_blobs.append(out.data.cpu().numpy())
 
 def returnCAM(feature_conv, weight_softmax, class_idx, size_upsample = (256, 256), inter=cv2.INTER_LINEAR):

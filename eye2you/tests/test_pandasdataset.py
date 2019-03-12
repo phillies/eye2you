@@ -1,7 +1,7 @@
 import os
 import pathlib
-import filecmp
 
+import eye2you
 import eye2you.io_helper
 import numpy as np
 import pytest
@@ -242,9 +242,9 @@ def test_indexing(dataset_simple, dataset_transforms):
 
 def test_index_errors(dataset_simple):
     with pytest.raises(IndexError):
-        dataset_simple[1.0]
+        _ = dataset_simple[1.0]
     with pytest.raises(IndexError):
-        dataset_simple['abc']
+        _ = dataset_simple['abc']
 
 def test_data_dump(dataset_simple, tmp_path):
     dataset_simple.dump(tmp_path / 'test.csv')

@@ -1,3 +1,4 @@
+# pylint: disable=redefined-outer-name
 import pytest
 import numpy as np
 import torch

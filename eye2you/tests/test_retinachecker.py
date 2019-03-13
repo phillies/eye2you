@@ -1,3 +1,4 @@
+# pylint: disable=redefined-outer-name
 import configparser
 import os
 import pathlib

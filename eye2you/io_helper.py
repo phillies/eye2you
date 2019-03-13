@@ -49,6 +49,7 @@ def find_classes(directory):
     Ensures:
         No class is a subdirectory of another.
     """
+    print(sys.version_info)
     if sys.version_info >= (3, 5):
         # Faster and available in Python 3.5 and above
         classes = [d.name for d in os.scandir(directory) if d.is_dir()]

@@ -1,9 +1,13 @@
+# pylint: disable=redefined-outer-name
 import os
+import sys
 import pathlib
 import configparser
+from unittest.mock import patch, PropertyMock
 
 import numpy as np
 import pytest
+from PIL import Image
 
 import eye2you
 import eye2you.make_default_config
@@ -13,6 +17,9 @@ from eye2you.meter_functions import AccuracyMeter, AverageMeter
 LOCAL_DIR = pathlib.Path(os.path.dirname(os.path.realpath(__file__)))
 RANDOM_SEED = 1337
 SAMPLE_NUMBER = 1000
+
+NUMBER_OF_CLASSES = 2
+NUMBER_OF_IMAGES = 4
 
 # convert each random number [0,1) into an integer k=[1,PSEUDO_SAMPLE_NUMBER]
 # to simulate that k out of PSEUDO_SAMPLE_SIZE were correct
@@ -152,3 +159,31 @@ def test_default_config(tmp_path):
 
     eye2you.make_default_config.save_config(filename, config)
     assert os.path.isfile(filename)
+
+
+def test_image_reading():
+    img = eye2you.io_helper.pil_loader(LOCAL_DIR / 'data/classA/img0.jpg')
+    assert not img is None
+    assert isinstance(img, Image.Image)
+
+def test_data_reading():
+    path = LOCAL_DIR / 'data'
+    classes, class_to_idx = eye2you.io_helper.find_classes(path)
+    assert len(classes)==NUMBER_OF_CLASSES
+    assert len(class_to_idx)==NUMBER_OF_CLASSES
+    for ii in range(NUMBER_OF_CLASSES):
+        assert class_to_idx[classes[ii]]==ii
+    
+    class_to_idx['nonexisting_class'] = 2
+    images = eye2you.io_helper.make_dataset(path, class_to_idx, eye2you.io_helper.IMG_EXTENSIONS)
+    assert len(images)==NUMBER_OF_IMAGES
+
+@patch('eye2you.io_helper.sys')
+def test_data_reading_pre35(mock_sys):
+    path = LOCAL_DIR / 'data'
+    type(mock_sys).version_info = PropertyMock(return_value=(3,4))
+    classes, class_to_idx = eye2you.io_helper.find_classes(path)
+    assert len(classes)==NUMBER_OF_CLASSES
+    assert len(class_to_idx)==NUMBER_OF_CLASSES
+    for ii in range(NUMBER_OF_CLASSES):
+        assert class_to_idx[classes[ii]]==ii

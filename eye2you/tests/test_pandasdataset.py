@@ -1,8 +1,7 @@
+# pylint: disable=redefined-outer-name
 import os
 import pathlib
 
-import eye2you
-import eye2you.io_helper
 import numpy as np
 import pytest
 import torch
@@ -24,25 +23,6 @@ def dataset_transforms():
     data = PandasDataset(source=(LOCAL_DIR / 'data.csv'), root=(LOCAL_DIR / 'data'),
                         transform=transforms.ToTensor(), target_transform=(lambda x: x+1))
     return data
-
-def test_image_reading():
-    img = eye2you.io_helper.pil_loader(LOCAL_DIR / 'data/classA/img0.jpg')
-    assert not img is None
-    assert isinstance(img, Image.Image)
-
-def test_data_reading():
-    path = LOCAL_DIR / 'data'
-    classes, class_to_idx = eye2you.io_helper.find_classes(path)
-    assert len(classes)==NUMBER_OF_CLASSES
-    assert len(class_to_idx)==NUMBER_OF_CLASSES
-    for ii in range(NUMBER_OF_CLASSES):
-        assert class_to_idx[classes[ii]]==ii
-    
-
-    class_to_idx['nonexisting_class'] = 2
-    images = eye2you.io_helper.make_dataset(path, class_to_idx, eye2you.io_helper.IMG_EXTENSIONS)
-    assert len(images)==NUMBER_OF_IMAGES
-
 
 def test_modes():
     with pytest.raises(ValueError):

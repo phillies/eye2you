@@ -55,6 +55,8 @@ class Service():
             self.initialize()
 
     def initialize(self):
+        if self.checkpoint is None:
+            raise ValueError('checkpoint cannot be None')
         self.retina_checker = RetinaChecker()
         self.retina_checker.initialize(self.checkpoint)
         self.retina_checker.initialize_model()
@@ -78,11 +80,11 @@ class Service():
         ])
 
         # This is the initialization of the class activation map extraction
-        
-        finalconv_name = list(self.retina_checker.model._modules.keys())[-2]
+        # Yes, accessing protected members is not a good style. We'll fix that later ;-)
+        finalconv_name = list(self.retina_checker.model._modules.keys())[-2]  #pylint: disable=protected-access
         # hook the feature extractor
 
-        self.retina_checker.model._modules.get(finalconv_name).register_forward_hook(hook_feature)
+        self.retina_checker.model._modules.get(finalconv_name).register_forward_hook(hook_feature) #pylint: disable=protected-access
     
     def classify_image(self, image):
         if not isinstance(image, Image.Image):
@@ -156,6 +158,6 @@ class Service():
     def __str__(self):
         desc = 'medAI Service:\n'
         desc += 'Loaded from {}\n'.format(self.checkpoint)
-        desc += 'RetinaChecker:\n' + self.retina_checker._str_core_info()
+        desc += 'RetinaChecker:\n' + self.retina_checker._str_core_info() # pylint disable:protected-access
         desc += 'Transform:\n' + str(self.transform)
         return desc

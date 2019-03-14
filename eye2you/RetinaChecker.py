@@ -14,11 +14,12 @@ import torchvision.transforms as transforms
 from .PandasDataset import PandasDataset
 from .meter_functions import AccuracyMeter, AverageMeter, all_or_nothing_performance
 
+
 class RetinaChecker():
     """Deep learning model
     """
 
-    def __init__( self ):
+    def __init__(self):
         self.device = None
         self.config = None
         self.config_string = None
@@ -65,7 +66,7 @@ class RetinaChecker():
     def num_classes(self):
         return len(self.classes)
 
-    def __str__( self ):
+    def __str__(self):
         desc = 'RetinaChecker\n'
         if self.initialized:
             desc += self._str_core_info()
@@ -120,8 +121,8 @@ class RetinaChecker():
         self.initialize_optimizer()
 
         self.config['input']['checkpoint'] = checkpoint
-        self.load_state()    
-    
+        self.load_state()
+
     def initialize(self, config):
         if config is None:
             raise ValueError('config cannot be None')
@@ -142,18 +143,17 @@ class RetinaChecker():
                         raise ValueError('Checkpoint has no config stored')
                 except Exception:
                     raise ValueError('Could not recognize config type')
-        
-        
+
         elif isinstance(config, configparser.ConfigParser):
             self.config = config
-            self.classes = {0:'undefined'}
+            self.classes = {0: 'undefined'}
 
         else:
             raise ValueError('Could not recognize config type')
-        
+
         self._parse_config()
 
-    def _parse_config( self ):
+    def _parse_config(self):
         if self.config is None:
             raise ValueError('self.config cannot be None')
 
@@ -185,10 +185,9 @@ class RetinaChecker():
         if self.device is None:
             self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         print('Using device', self.device)
-        self.initialized = True   
+        self.initialized = True
 
-
-    def initialize_optimizer( self, **kwargs ):
+    def initialize_optimizer(self, **kwargs):
         optimizer_loader = None
         if self.optimizer_name in torch.optim.__dict__.keys():
             optimizer_loader = torch.optim.__dict__[self.optimizer_name]
@@ -197,9 +196,10 @@ class RetinaChecker():
             return
 
         self.optimizer = optimizer_loader(self.model.parameters(), lr=self.learning_rate, **kwargs)
-        self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, self.learning_rate_decay_step_size, gamma=self.learning_rate_decay_gamma)
+        self.scheduler = torch.optim.lr_scheduler.StepLR(
+            self.optimizer, self.learning_rate_decay_step_size, gamma=self.learning_rate_decay_gamma)
 
-    def initialize_criterion( self, **kwargs ):
+    def initialize_criterion(self, **kwargs):
         criterion_loader = None
         if self.criterion_name in nn.__dict__.keys():
             criterion_loader = nn.__dict__[self.criterion_name]
@@ -209,21 +209,21 @@ class RetinaChecker():
 
         self.criterion = criterion_loader(**kwargs)
 
-    def initialize_model( self, **kwargs ):
+    def initialize_model(self, **kwargs):
         model_loader = None
         if self.model_name in models.__dict__.keys():
             model_loader = models.__dict__[self.model_name]
         else:
             warnings.warn('Could not identify model')
             return
-        
-        self.model = model_loader( pretrained=self.model_pretrained, **kwargs)
+
+        self.model = model_loader(pretrained=self.model_pretrained, **kwargs)
         num_ftrs = self.model.fc.in_features
         self.model.fc = nn.Linear(num_ftrs, self.num_classes)
         self.model.AuxLogits.fc = nn.Linear(self.model.AuxLogits.fc.in_features, self.num_classes)
         self.model = self.model.to(self.device)
 
-    def load_datasets( self, test_size=0.1 ):
+    def load_datasets(self, test_size=0.1):
         '''Loads the data sets from the path given in the config file
         '''
 
@@ -234,38 +234,47 @@ class RetinaChecker():
                 self.test_dataset = dataset.subset(self.split_indices[1])
                 self.test_dataset.transform = test_transform
             else:
-                self.test_dataset = PandasDataset(source=self.test_file, mode='csv',
-                                                root=self.test_root,
-                                                transform=test_transform, target_transform=None)
+                self.test_dataset = PandasDataset(
+                    source=self.test_file,
+                    mode='csv',
+                    root=self.test_root,
+                    transform=test_transform,
+                    target_transform=None)
         else:
             test_transform = self._get_test_transform(self.normalize_factors)
             train_transform = self._get_training_transform(self.normalize_factors)
-            
+
             if self.split_indices is not None:
                 dataset = PandasDataset(source=self.train_file, mode='csv', root=self.train_root)
                 self.train_dataset = dataset.subset(self.split_indices[0])
                 self.test_dataset = dataset.subset(self.split_indices[1])
                 self.train_dataset.transform = train_transform
                 self.test_dataset.transform = test_transform
-            elif self.test_file is None or not os.path.isfile(self.test_file): 
+            elif self.test_file is None or not os.path.isfile(self.test_file):
                 dataset = PandasDataset(source=self.train_file, mode='csv', root=self.train_root)
                 self.split_indices = []
-                self.train_dataset, self.test_dataset = dataset.split(test_size=test_size, return_indices=self.split_indices)
+                self.train_dataset, self.test_dataset = dataset.split(
+                    test_size=test_size, return_indices=self.split_indices)
                 self.train_dataset.transform = train_transform
                 self.test_dataset.transform = test_transform
 
             else:
-                self.train_dataset = PandasDataset(source=self.train_file, mode='csv',
-                                                            root=self.train_root,
-                                                            transform=train_transform, target_transform=None)
-                self.test_dataset = PandasDataset(source=self.test_file, mode='csv',
-                                                            root=self.test_root,
-                                                            transform=test_transform, target_transform=None)
+                self.train_dataset = PandasDataset(
+                    source=self.train_file,
+                    mode='csv',
+                    root=self.train_root,
+                    transform=train_transform,
+                    target_transform=None)
+                self.test_dataset = PandasDataset(
+                    source=self.test_file,
+                    mode='csv',
+                    root=self.test_root,
+                    transform=test_transform,
+                    target_transform=None)
 
         self.classes = self.test_dataset.class_to_idx
 
-    
-    def create_dataloader( self, num_workers=8, sampling_relevance=None ):
+    def create_dataloader(self, num_workers=8, sampling_relevance=None):
         """Generates the dataloader (and their respective samplers) for
         training and test data from the training and test data sets.
         Sampler for training data is an unbiased sampler for all classes
@@ -279,27 +288,35 @@ class RetinaChecker():
         """
 
         batch_size = self.config['hyperparameter'].getint('batch size', 32)
-        
+
         if not self.config['input'].getboolean('evaluation only', False):
             num_samples = self.config['files'].getint('samples', 6400)
-        
-            train_sampler = self._get_sampler( self.train_dataset, num_samples, sampling_relevance )
 
-            self.train_loader = torch.utils.data.DataLoader(dataset=self.train_dataset,
-                                                    batch_size=batch_size,
-                                                    shuffle=False,
-                                                    sampler=train_sampler,
-                                                    num_workers=num_workers)
+            train_sampler = self._get_sampler(self.train_dataset, num_samples, sampling_relevance)
+
+            self.train_loader = torch.utils.data.DataLoader(
+                dataset=self.train_dataset,
+                batch_size=batch_size,
+                shuffle=False,
+                sampler=train_sampler,
+                num_workers=num_workers)
 
         test_sampler = None
 
-        self.test_loader = torch.utils.data.DataLoader(dataset=self.test_dataset,
-                                                batch_size=batch_size,
-                                                shuffle=False,
-                                                sampler=test_sampler,
-                                                num_workers=num_workers)
+        self.test_loader = torch.utils.data.DataLoader(
+            dataset=self.test_dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            sampler=test_sampler,
+            num_workers=num_workers)
 
-    def save_state( self, filename, train_loss=None, train_accuracy=None, test_loss=None, test_accuracy=None, test_confusion=None ):
+    def save_state(self,
+                   filename,
+                   train_loss=None,
+                   train_accuracy=None,
+                   test_loss=None,
+                   test_accuracy=None,
+                   test_confusion=None):
         """Save the current state of the model including history of training and test performance (optionally)
         
         Arguments:
@@ -315,7 +332,7 @@ class RetinaChecker():
         save_dict = {
             'epoch': self.epoch,
             'state_dict': self.model.state_dict(),
-            'optimizer' : self.optimizer.state_dict(),
+            'optimizer': self.optimizer.state_dict(),
             'train_loss': train_loss,
             'train_accuracy': train_accuracy,
             'test_loss': test_loss,
@@ -331,14 +348,14 @@ class RetinaChecker():
             save_dict['train_root'] = self.train_root
         if self.test_file is not None:
             save_dict['test_file'] = self.test_file
-            save_dict['test_root'] = self.test_root 
+            save_dict['test_root'] = self.test_root
         if self.split_indices is not None:
             save_dict['train_indices'] = self.split_indices[0]
-            save_dict['test_indices'] = self.split_indices[1] 
-            
+            save_dict['test_indices'] = self.split_indices[1]
+
         torch.save(save_dict, filename)
 
-    def load_state( self, filename=None ):
+    def load_state(self, filename=None):
         """Load the state stored in the config into the given model and optimizer.
         Model and optimizer must match exactly to the stored model, will crash
         otherwise.
@@ -350,7 +367,7 @@ class RetinaChecker():
             #    checkpoint = torch.load(filename)
             #else:
             checkpoint = torch.load(filename, map_location=self.device)
-            
+
             self.start_epoch = checkpoint['epoch']
             self.epoch = self.start_epoch
             self.model.load_state_dict(checkpoint['state_dict'], strict=False)
@@ -363,14 +380,17 @@ class RetinaChecker():
                     for g in self.optimizer.param_groups:
                         if 'initial_lr' not in g:
                             g['initial_lr'] = g['lr']
-                    self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, self.learning_rate_decay_step_size, gamma=self.learning_rate_decay_gamma, last_epoch=self.start_epoch)
+                    self.scheduler = torch.optim.lr_scheduler.StepLR(
+                        self.optimizer,
+                        self.learning_rate_decay_step_size,
+                        gamma=self.learning_rate_decay_gamma,
+                        last_epoch=self.start_epoch)
 
-            print("=> loaded checkpoint '{}' (epoch {})"
-                    .format(filename, checkpoint['epoch']))
+            print("=> loaded checkpoint '{}' (epoch {})".format(filename, checkpoint['epoch']))
         except OSError as e:
             print("Exception occurred. Did not load model, starting from scratch.\n", e)
 
-    def load_state_data( self ):
+    def load_state_data(self):
         """Load the state stored in the config into the given model and optimizer.
         Model and optimizer must match exactly to the stored model, will crash
         otherwise.
@@ -381,18 +401,18 @@ class RetinaChecker():
             else:
                 checkpoint = torch.load(self.config['input'].get('checkpoint'), map_location='cpu')
             if 'train_file' in checkpoint:
-                self.train_file = checkpoint['train_file'] 
+                self.train_file = checkpoint['train_file']
                 self.train_root = checkpoint['train_root']
             if 'test_file' in checkpoint:
-                self.test_file = checkpoint['test_file'] 
-                self.test_root = checkpoint['test_root'] 
+                self.test_file = checkpoint['test_file']
+                self.test_root = checkpoint['test_root']
             if 'train_indices' in checkpoint:
                 self.split_indices = [(checkpoint['train_indices'], checkpoint['test_indices'])]
             print("=> loaded data configuration")
         except OSError as e:
             print("Exception occurred. Did not load data\n", e)
 
-    def load_data_split( self ):
+    def load_data_split(self):
         """Load the state stored in the config into the given model and optimizer.
         Model and optimizer must match exactly to the stored model, will crash
         otherwise.
@@ -410,65 +430,63 @@ class RetinaChecker():
         except OSError as e:
             print("Exception occurred. Did not load data\n", e)
 
-    def _get_training_transform( self, normalize_factors=None ):
+    def _get_training_transform(self, normalize_factors=None):
 
         rotation_angle = self.config['transform'].getint('rotation angle', 0)
         rotation = transforms.RandomRotation(rotation_angle)
-        
+
         brightness = self.config['transform'].getfloat('brightness', 0)
         contrast = self.config['transform'].getfloat('contrast', 0)
         saturation = self.config['transform'].getfloat('saturation', 0)
         hue = self.config['transform'].getfloat('hue', 0)
         min_scale = self.config['transform'].getfloat('min scale', 0.25)
         max_scale = self.config['transform'].getfloat('max scale', 1.0)
-        color_jitter = transforms.RandomApply([transforms.ColorJitter(brightness=brightness, contrast=contrast, saturation=saturation, hue=hue)])
-        
-        randcrop = transforms.RandomChoice((
-            transforms.RandomResizedCrop(size=self.image_size, scale=(min_scale, max_scale), ratio=(1,1)),
-            transforms.RandomResizedCrop(size=self.image_size, scale=(min_scale, 0.4), ratio=(0.8,1.25))
-        ))
+        color_jitter = transforms.RandomApply(
+            [transforms.ColorJitter(brightness=brightness, contrast=contrast, saturation=saturation, hue=hue)])
+
+        randcrop = transforms.RandomChoice(
+            (transforms.RandomResizedCrop(size=self.image_size, scale=(min_scale, max_scale), ratio=(1, 1)),
+             transforms.RandomResizedCrop(size=self.image_size, scale=(min_scale, 0.4), ratio=(0.8, 1.25))))
 
         transform_list = []
         if brightness != 0 or contrast != 0 or saturation != 0 or hue != 0:
             transform_list.append(color_jitter)
-        
+
         if rotation_angle != 0:
             transform_list.append(rotation)
-        
-        transform_list += [ 
+
+        transform_list += [
             transforms.RandomHorizontalFlip(p=0.2),
             transforms.RandomVerticalFlip(p=0.2),
             randcrop,
             transforms.ToTensor(),
         ]
-        
+
         if not normalize_factors is None:
-            normalize = transforms.Normalize(mean=normalize_factors[0],
-                                            std=normalize_factors[1])
+            normalize = transforms.Normalize(mean=normalize_factors[0], std=normalize_factors[1])
             transform_list.append(normalize)
 
         train_transform = transforms.Compose(transform_list)
 
         return train_transform
-    
-    def _get_test_transform( self, normalize_factors=None ):
+
+    def _get_test_transform(self, normalize_factors=None):
         # normalization factors for the DMR dataset were manually derived
         transform_list = [
-                transforms.Resize(size=int(self.image_size*self.test_scale_factor)),
-                transforms.CenterCrop(size=self.image_size),
-                transforms.ToTensor(),
-            ]
-        
+            transforms.Resize(size=int(self.image_size * self.test_scale_factor)),
+            transforms.CenterCrop(size=self.image_size),
+            transforms.ToTensor(),
+        ]
+
         if not normalize_factors is None:
-            normalize = transforms.Normalize(mean=normalize_factors[0],
-                                            std=normalize_factors[1])
+            normalize = transforms.Normalize(mean=normalize_factors[0], std=normalize_factors[1])
             transform_list.append(normalize)
 
         test_transform = transforms.Compose(transform_list)
 
         return test_transform
 
-    def train( self, evaluate_performance=all_or_nothing_performance ):
+    def train(self, evaluate_performance=all_or_nothing_performance):
         '''Deep learning training function to optimize the network with all images in the train_loader.
         
         Returns:
@@ -493,7 +511,7 @@ class RetinaChecker():
             labels = labels.to(self.device)
 
             # Forward pass
-            # inception returns 2 outputs, the regular output and the aux logits output. We need to calculate 
+            # inception returns 2 outputs, the regular output and the aux logits output. We need to calculate
             # the loss on both
             outputs = self.model(images)
             if isinstance(outputs, tuple):
@@ -504,7 +522,7 @@ class RetinaChecker():
             # store results & evaluate accuracy
             losses.update(loss.item(), images.size(0))
 
-            num_correct = evaluate_performance( labels, outputs )
+            num_correct = evaluate_performance(labels, outputs)
             accuracy.update(num_correct, labels.size(0))
 
             # Backward and optimize
@@ -514,17 +532,16 @@ class RetinaChecker():
 
             #current_time = time.time()
             #print('Epoch [{}], Step [{}/{}], Loss: {:.4f},  Samples: {}, Correct: {} ({:.1f}%),  time in epoch {}, epoch remaining {}'
-            #    .format(self.epoch + 1, i + 1, len(self.train_loader), loss.item(), labels.size(0), num_correct, 
+            #    .format(self.epoch + 1, i + 1, len(self.train_loader), loss.item(), labels.size(0), num_correct,
             #        num_correct/labels.size(0)*100,
-            #        pretty_print_time(current_time-start_time_epoch), 
+            #        pretty_print_time(current_time-start_time_epoch),
             #        pretty_time_left(start_time_epoch, i+1, len(self.train_loader))))
-        print('Epoch learning completed. Training accuracy {:.1f}%'.format(accuracy.avg*100))
+        print('Epoch learning completed. Training accuracy {:.1f}%'.format(accuracy.avg * 100))
 
         self.epoch += 1
-        return losses, accuracy   
+        return losses, accuracy
 
-
-    def validate(self, test_loader = None, evaluate_performance=all_or_nothing_performance, confusion_matrix_label=None):
+    def validate(self, test_loader=None, evaluate_performance=all_or_nothing_performance, confusion_matrix_label=None):
         '''Evaluates the model given the criterion and the data in test_loader
         
         Arguments:
@@ -545,7 +562,7 @@ class RetinaChecker():
             test_loader = self.test_loader
 
         if confusion_matrix_label is None:
-            confusion_matrix_label = min(self.num_classes-1, 5)
+            confusion_matrix_label = min(self.num_classes - 1, 5)
 
         self.model.eval()  # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)
         with torch.no_grad():
@@ -564,21 +581,19 @@ class RetinaChecker():
 
                 losses.update(loss.item(), images.size(0))
 
-                num_correct = evaluate_performance( labels, outputs )
+                num_correct = evaluate_performance(labels, outputs)
                 accuracy.update(num_correct, labels.size(0))
 
                 predicted = torch.nn.Sigmoid()(outputs).round()
 
-                for pred, lab in zip(predicted[:,confusion_matrix_label], labels[:,confusion_matrix_label]):
+                for pred, lab in zip(predicted[:, confusion_matrix_label], labels[:, confusion_matrix_label]):
                     confusion[int(pred.item()), int(lab.item())] += 1
 
                 #print('Test - samples: {}, correct: {} ({:.1f}%), loss: {}'.format(labels.size(0), num_correct, num_correct/labels.size(0)*100, loss.item()))
-                
-        
+
         return losses, accuracy, confusion
 
-
-    def _get_sampler( self, dataset, num_samples, relevant_slice=None ):
+    def _get_sampler(self, dataset, num_samples, relevant_slice=None):
         '''The distribution of samples in training and test data is not equal, i.e.
         the normal class is over represented. To get an unbiased sample (for example with 5
         classes each class should make up for about 20% of the samples) we calculate the 
@@ -598,19 +613,19 @@ class RetinaChecker():
         '''
         if relevant_slice is None:
             relevant_slice = range(self.num_classes)
-        
-        class_distribution = np.vstack([s for s in dataset.targets]).astype(np.int)[:,relevant_slice]
+
+        class_distribution = np.vstack([s for s in dataset.targets]).astype(np.int)[:, relevant_slice]
         weights = np.zeros(len(relevant_slice))
         for ii in range(len(relevant_slice)):
-            weights[ii] = np.sum(class_distribution[:,ii] == 1)/len(class_distribution)
+            weights[ii] = np.sum(class_distribution[:, ii] == 1) / len(class_distribution)
 
-        inverted_weights = (1/weights)/np.sum(1/weights)
+        inverted_weights = (1 / weights) / np.sum(1 / weights)
         sampling_weights = np.zeros(class_distribution.shape[0], dtype=np.float)
         for ii in range(len(relevant_slice)):
-            sampling_weights[class_distribution[:,ii] == 1] = inverted_weights[ii]
+            sampling_weights[class_distribution[:, ii] == 1] = inverted_weights[ii]
         sampling_weights /= sampling_weights.sum()
 
-        sampler = torch.utils.data.WeightedRandomSampler( sampling_weights, num_samples, True )
+        sampler = torch.utils.data.WeightedRandomSampler(sampling_weights, num_samples, True)
         return sampler
 
     def _update_config_string(self):

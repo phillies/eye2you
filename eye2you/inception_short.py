@@ -3,12 +3,14 @@ https://github.com/pytorch/vision/blob/master/torchvision/models/inception.py
 licensed under BSD-3
 '''
 import warnings
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision.models.inception import InceptionA, InceptionB, InceptionC, BasicConv2d
+from torchvision.models.inception import (BasicConv2d, InceptionA, InceptionB, InceptionC)
 
 __all__ = ['Inception3S', 'Inception3XS', 'inception_v3_s', 'inception_v3_xs']
+
 
 def inception_v3_s(pretrained=False, **kwargs):
     if pretrained:
@@ -16,11 +18,13 @@ def inception_v3_s(pretrained=False, **kwargs):
 
     return Inception3S(**kwargs)
 
+
 def inception_v3_xs(pretrained=False, **kwargs):
     if pretrained:
         warnings.warn('No pretraining available. Using random.')
 
-    return Inception3XS(**kwargs)   
+    return Inception3XS(**kwargs)
+
 
 class Inception3S(nn.Module):
 
@@ -109,6 +113,7 @@ class Inception3S(nn.Module):
             return x, aux
         return x
 
+
 class Inception3XS(nn.Module):
 
     def __init__(self, num_classes=1000, transform_input=False):
@@ -172,6 +177,7 @@ class Inception3XS(nn.Module):
         x = self.fc(x)
         # 1000 (num_classes)
         return x
+
 
 class InceptionAux(nn.Module):
 

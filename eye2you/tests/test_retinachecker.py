@@ -20,12 +20,12 @@ def test_create_checker(tmp_path, example_config):
     # create the checker class and initialize internal variables
     rc = RetinaChecker()
     assert not rc.initialized
-    assert str(rc).count('not initialized')>0
+    assert str(rc).count('not initialized') > 0
 
     rc.initialize(config)
 
     assert rc.initialized
-    assert str(rc).count('not initialized')==0
+    assert str(rc).count('not initialized') == 0
 
     # Initialize the model
     rc.initialize_model()
@@ -40,21 +40,26 @@ def test_create_checker(tmp_path, example_config):
 
     assert os.path.isfile(tmp_path / 'tmpmodel.ckpt')
 
+
 def test_loading_data():
     #assert False #TODO: implement me
     pass
+
 
 def test_creating_dataloader():
     #assert False #TODO: implement me
     pass
 
+
 def test_reloading():
     #assert False #TODO: implement me
     pass
 
+
 def test_load_data_split():
     #assert False #TODO: implement me
     pass
+
 
 def test_train_and_validation():
     cfg = '''[network]
@@ -103,16 +108,18 @@ def test_train_and_validation():
     losses, accuracy = rc.train()
     assert losses is not None
     assert accuracy is not None
-    
+
     # Validation
     losses, accuracy, confusion = rc.validate()
     assert losses is not None
     assert accuracy is not None
     assert confusion is not None
 
+
 def test_validate():
     #assert False #TODO: implement me
     pass
+
 
 def test_printing():
     # Pretrained
@@ -120,36 +127,40 @@ def test_printing():
     #assert False #TODO: implement me
     pass
 
+
 def test_initialize_unknown_config():
     #String but no config or checkpoint
     #not string not config
     #assert False #TODO: implement me
     pass
 
+
 def test_loading(checkpoint_file):
     # with an without filename (filename in config->inpit->checkpoint)
     # with optimizer not None
-        # with scheduler in checkoiunt and not 
+    # with scheduler in checkoiunt and not
     #assert False #TODO: implement me
     pass
+
 
 def test_parse_config(checkpoint_file):
     rc = RetinaChecker()
     assert rc.config is None
     with pytest.raises(ValueError):
         rc._parse_config()
-    
+
     config = eye2you.make_default_config.get_config()
     rc.initialize(config)
     rc.initialize_model()
     rc.initialize_criterion()
     rc.initialize_optimizer()
-    rc.split_indices = ([1,2,3], [4,5,6])
+    rc.split_indices = ([1, 2, 3], [4, 5, 6])
 
     rc.save_state(checkpoint_file)
 
+
 def test_warning_unknown_names():
-    rc = RetinaChecker()  
+    rc = RetinaChecker()
     config = eye2you.make_default_config.get_config()
     rc.initialize(config)
 

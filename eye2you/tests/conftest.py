@@ -22,13 +22,16 @@ def example_config():
     [input]'''
     return CONFIG_STRING
 
+
 @pytest.fixture
 def data_labels():
-    return torch.Tensor(np.random.rand(100,3)).round()
+    return torch.Tensor(np.random.rand(100, 3)).round()
+
 
 @pytest.fixture
 def data_outputs():
-    return torch.Tensor(np.random.randn(100,3))
+    return torch.Tensor(np.random.randn(100, 3))
+
 
 @pytest.fixture(scope='module')
 def retina_checker(example_config):
@@ -45,6 +48,7 @@ def retina_checker(example_config):
     rc.initialize_criterion()
     rc.initialize_optimizer()
     return rc
+
 
 @pytest.fixture(scope='module')
 def checkpoint_file(tmp_path_factory, retina_checker):

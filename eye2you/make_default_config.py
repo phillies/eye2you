@@ -1,5 +1,6 @@
 import configparser
 
+
 def get_config():
     """Creates the default configuration file for RetinaChecker
     
@@ -9,62 +10,59 @@ def get_config():
     config = configparser.ConfigParser()
 
     config['network'] = {
-    'model': 'inception_v3',
-    'pretrained': False,
-    'optimizer': 'Adam',
-    'criterion': 'BCEWithLogitsLoss',
+        'model': 'inception_v3',
+        'pretrained': False,
+        'optimizer': 'Adam',
+        'criterion': 'BCEWithLogitsLoss',
     }
 
     config['hyperparameter'] = {
-    'epochs': 50,
-    'batch size': 64,
-    'learning rate': 0.001,
-    'lr decay step': 50,
-    'lr decay gamma': 0.5,
-    'early stop': True,
-    'early stop threshold': 0.0,
-    'early stop window': 30
+        'epochs': 50,
+        'batch size': 64,
+        'learning rate': 0.001,
+        'lr decay step': 50,
+        'lr decay gamma': 0.5,
+        'early stop': True,
+        'early stop threshold': 0.0,
+        'early stop window': 30
     }
 
     config['files'] = {
-    'train file': 'label.csv',
-    'train root': './train',
-    'test file': '',
-    'test root': '',
-    'image size': 299,
-    'samples': 6400,
-    'num workers': 8
+        'train file': 'label.csv',
+        'train root': './train',
+        'test file': '',
+        'test root': '',
+        'image size': 299,
+        'samples': 6400,
+        'num workers': 8
     }
 
     config['transform'] = {
-    'rotation angle': 180,
-    'brightness': 0,
-    'contrast': 0,
-    'saturation': 0,
-    'hue': 0,
-    'min scale': 0.25,
-    'max scale': 1.0,
-    'normalize mean': '[0.1,0.2,0.3]',
-    'normalize std': '[0.1,0.2,0.3]'
+        'rotation angle': 180,
+        'brightness': 0,
+        'contrast': 0,
+        'saturation': 0,
+        'hue': 0,
+        'min scale': 0.25,
+        'max scale': 1.0,
+        'normalize mean': '[0.1,0.2,0.3]',
+        'normalize std': '[0.1,0.2,0.3]'
     }
 
     config['output'] = {
-    'save during training': True,
-    'save every nth epoch': 1,
-    'filename': 'model',
-    'extension': '.ckpt',
-    'cleanup': True
+        'save during training': True,
+        'save every nth epoch': 1,
+        'filename': 'model',
+        'extension': '.ckpt',
+        'cleanup': True
     }
 
-    config['input'] = {
-    'checkpoint': 'model.ckpt',
-    'resume': False,
-    'evaluation only': False
-    }
+    config['input'] = {'checkpoint': 'model.ckpt', 'resume': False, 'evaluation only': False}
 
     return config
 
-def save_config( filename = 'default.cfg', config = None ):
+
+def save_config(filename='default.cfg', config=None):
     """Stores the default configuration file
     
     Keyword Arguments:

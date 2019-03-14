@@ -2,6 +2,7 @@
 import pytest
 from eye2you import MEService
 
+
 def test_initialization():
     filename = 'd:/ckpt/model_test.ckpt'
     mes = MEService(filename)
@@ -10,7 +11,8 @@ def test_initialization():
     assert len(mes.retina_checker) == 2
     for rc in mes.retina_checker:
         assert rc.initialized
-    
+
+
 def test_wrong_initialization():
     mes = MEService(None)
     with pytest.raises(ValueError):

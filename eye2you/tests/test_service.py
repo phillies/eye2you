@@ -15,6 +15,7 @@ def default_service(checkpoint_file):
     service = Service(checkpoint_file)
     return service
 
+
 def test_create_service(checkpoint_file):
     with pytest.raises(ValueError):
         service = Service(None)
@@ -26,14 +27,15 @@ def test_create_service(checkpoint_file):
     service = Service(checkpoint_file)
     assert service is not None
 
+
 def test_classify():
     print(default_service)
-    assert True #TODO: implement me
+    assert True  #TODO: implement me
+
 
 def test_cam():
-    assert True #TODO: implement me
+    assert True  #TODO: implement me
+
 
 def test_contour():
-    assert True #TODO: implement me
-
-
+    assert True  #TODO: implement me

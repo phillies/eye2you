@@ -20,7 +20,14 @@ class PandasDataset(torch.utils.data.Dataset):
         [type] -- [description]
     """
 
-    def __init__(self, source=None, root=None, mode='csv', loader=pil_loader, extensions=IMG_EXTENSIONS, transform=None, target_transform=None):
+    def __init__(self,
+                 source=None,
+                 root=None,
+                 mode='csv',
+                 loader=pil_loader,
+                 extensions=IMG_EXTENSIONS,
+                 transform=None,
+                 target_transform=None):
 
         #TODO: ImageFolderPlus mode loads like ImageFolder plus files in the root directory with class NaN
         #TODO: Video mode loads all video files (don't forget extensions!) and assigns the classes to frames
@@ -39,7 +46,9 @@ class PandasDataset(torch.utils.data.Dataset):
         elif mode == 'ImageFolder':
             classes, class_to_idx = find_classes(root)
             images = make_dataset(root, class_to_idx, extensions)
-            samples = pd.DataFrame.from_dict({item[0]: item[1] for item in images}, orient='index', columns=['class_id'])
+            samples = pd.DataFrame.from_dict({item[0]: item[1] for item in images},
+                                             orient='index',
+                                             columns=['class_id'])
             samples.index.name = 'filename'
         elif mode == 'pandas':
             samples = source
@@ -87,24 +96,39 @@ class PandasDataset(torch.utils.data.Dataset):
             return_indices {list} -- List where the indices of the split will be appended. (default: {None})
         """
 
-        sss = sklearn.model_selection.StratifiedShuffleSplit(n_splits=1, test_size=test_size, train_size=train_size, random_state=random_state)
+        sss = sklearn.model_selection.StratifiedShuffleSplit(
+            n_splits=1, test_size=test_size, train_size=train_size, random_state=random_state)
         train_index, test_index = next(iter(sss.split(self.filenames, self.targets)))
-        train_set = PandasDataset(source=self.samples.iloc[train_index], root=self.root, mode='pandas', 
-                                    loader=self.loader, extensions=self.extensions, transform=self.transform, 
-                                    target_transform=self.target_transform)
-        test_set = PandasDataset(source=self.samples.iloc[test_index], root=self.root, mode='pandas', 
-                                    loader=self.loader, extensions=self.extensions, transform=self.transform, 
-                                    target_transform=self.target_transform)
+        train_set = PandasDataset(
+            source=self.samples.iloc[train_index],
+            root=self.root,
+            mode='pandas',
+            loader=self.loader,
+            extensions=self.extensions,
+            transform=self.transform,
+            target_transform=self.target_transform)
+        test_set = PandasDataset(
+            source=self.samples.iloc[test_index],
+            root=self.root,
+            mode='pandas',
+            loader=self.loader,
+            extensions=self.extensions,
+            transform=self.transform,
+            target_transform=self.target_transform)
         if return_indices is not None and isinstance(return_indices, list):
             return_indices.append(train_index)
             return_indices.append(test_index)
         return train_set, test_set
 
-
     def clone(self):
-        data = PandasDataset(source=self.samples.copy(deep=True), root=self.root, mode='pandas', 
-                            loader=self.loader, extensions=self.extensions, transform=self.transform, 
-                            target_transform=self.target_transform)
+        data = PandasDataset(
+            source=self.samples.copy(deep=True),
+            root=self.root,
+            mode='pandas',
+            loader=self.loader,
+            extensions=self.extensions,
+            transform=self.transform,
+            target_transform=self.target_transform)
         return data
 
     def join(self, other, align_root=False):
@@ -115,20 +139,24 @@ class PandasDataset(torch.utils.data.Dataset):
         elif self.root != other.root:
             if align_root:
                 prefix = os.path.commonpath([self.root, other.root])
-                if prefix == '': #if there is no common prefix
+                if prefix == '':  #if there is no common prefix
                     self_index_prefix = self.root
                     other_index_prefix = other.root
                 else:
                     self_index_prefix = os.path.relpath(self.root, prefix)
                     other_index_prefix = os.path.relpath(other.root, prefix)
-                self.samples.index = [os.path.join( prefix,             # new root
-                                                    self_index_prefix,  # relative path between old root and new root
-                                                    os.path.relpath(idx, self.root)) for idx in self.samples.index] # base without old root
+                self.samples.index = [
+                    os.path.join(
+                        prefix,  # new root
+                        self_index_prefix,  # relative path between old root and new root
+                        os.path.relpath(idx, self.root)) for idx in self.samples.index
+                ]  # base without old root
 
                 other = other.clone()
-                other.samples.index = [os.path.join(    prefix,
-                                                        other_index_prefix, 
-                                                        os.path.relpath(idx, other.root)) for idx in other.samples.index]
+                other.samples.index = [
+                    os.path.join(prefix, other_index_prefix, os.path.relpath(idx, other.root))
+                    for idx in other.samples.index
+                ]
                 self.root = prefix
             else:
                 raise ValueError('root does not match')
@@ -146,7 +174,7 @@ class PandasDataset(torch.utils.data.Dataset):
 
         if nan_replace is not None:
             self.samples[self.samples.isna()] = nan_replace
-        
+
         self.refresh()
 
     def refresh(self):
@@ -158,9 +186,14 @@ class PandasDataset(torch.utils.data.Dataset):
         self.filenames = self.samples.index.values
 
     def subset(self, indices):
-        data = PandasDataset(source=self.samples.iloc[indices].copy(deep=True), root=self.root, mode='pandas', 
-                            loader=self.loader, extensions=self.extensions, transform=self.transform, 
-                            target_transform=self.target_transform)
+        data = PandasDataset(
+            source=self.samples.iloc[indices].copy(deep=True),
+            root=self.root,
+            mode='pandas',
+            loader=self.loader,
+            extensions=self.extensions,
+            transform=self.transform,
+            target_transform=self.target_transform)
         return data
 
     def dump(self, filename):
@@ -220,7 +253,12 @@ class PandasDataset(torch.utils.data.Dataset):
         data = self.samples.copy(deep=True)
         data = data.append(other.samples)
 
-        dataset = PandasDataset(source=data, root=self.root, mode='pandas', 
-                            loader=self.loader, extensions=self.extensions, transform=self.transform, 
-                            target_transform=self.target_transform)
+        dataset = PandasDataset(
+            source=data,
+            root=self.root,
+            mode='pandas',
+            loader=self.loader,
+            extensions=self.extensions,
+            transform=self.transform,
+            target_transform=self.target_transform)
         return dataset

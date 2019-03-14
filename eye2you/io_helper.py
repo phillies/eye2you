@@ -6,10 +6,12 @@ from PIL import Image
 
 IMG_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif']
 
+
 def pil_loader(path):
     with open(path, 'rb') as f:
         img = Image.open(f)
         return img.convert('RGB')
+
 
 def make_dataset(directory, class_to_idx, extensions):
     images = []
@@ -28,6 +30,7 @@ def make_dataset(directory, class_to_idx, extensions):
 
     return images
 
+
 def has_file_allowed_extension(filename, extensions):
     """Checks if a file is an allowed extension.
     Args:
@@ -38,6 +41,7 @@ def has_file_allowed_extension(filename, extensions):
     """
     filename_lower = filename.lower()
     return any(filename_lower.endswith(ext) for ext in extensions)
+
 
 def find_classes(directory):
     """

@@ -23,31 +23,34 @@ NUMBER_OF_IMAGES = 4
 
 # convert each random number [0,1) into an integer k=[1,PSEUDO_SAMPLE_NUMBER]
 # to simulate that k out of PSEUDO_SAMPLE_SIZE were correct
-PSEUDO_SAMPLE_SIZE = np.random.randint(1,100)
+PSEUDO_SAMPLE_SIZE = np.random.randint(1, 100)
 
 # maximum delta to pass numerical comparison
 EPSILON = 1e-9
 
 np.random.seed(RANDOM_SEED)
 
+
 @pytest.fixture(scope='module')
 def sample_data():
     data = np.random.rand(SAMPLE_NUMBER)
     return data
 
+
 def test_AccuracyMeter(sample_data):
     meter = AccuracyMeter()
-    accuracy_data = np.round(sample_data*PSEUDO_SAMPLE_SIZE)
+    accuracy_data = np.round(sample_data * PSEUDO_SAMPLE_SIZE)
     for ii in range(len(accuracy_data)):
         meter.update(accuracy_data[ii], PSEUDO_SAMPLE_SIZE)
-    assert abs(meter.avg - accuracy_data.sum()/sample_data.size/PSEUDO_SAMPLE_SIZE) < EPSILON
+    assert abs(meter.avg - accuracy_data.sum() / sample_data.size / PSEUDO_SAMPLE_SIZE) < EPSILON
     meter.reset()
-    assert meter.avg==0
-    assert meter.count==0
-    assert meter.sum==0
+    assert meter.avg == 0
+    assert meter.count == 0
+    assert meter.sum == 0
     for ii in range(len(accuracy_data)):
         meter.update(accuracy_data[ii], PSEUDO_SAMPLE_SIZE)
-    assert abs(meter.avg - accuracy_data.sum()/sample_data.size/PSEUDO_SAMPLE_SIZE) < EPSILON
+    assert abs(meter.avg - accuracy_data.sum() / sample_data.size / PSEUDO_SAMPLE_SIZE) < EPSILON
+
 
 def test_AverageMeter(sample_data):
     meter = AverageMeter()
@@ -55,17 +58,19 @@ def test_AverageMeter(sample_data):
         meter.update(sample_data[ii])
     assert abs(meter.avg - sample_data.mean()) < EPSILON
     meter.reset()
-    assert meter.avg==0
-    assert meter.val==0
-    assert meter.count==0
-    assert meter.sum==0
+    assert meter.avg == 0
+    assert meter.val == 0
+    assert meter.count == 0
+    assert meter.sum == 0
     for ii in range(len(sample_data)):
         meter.update(sample_data[ii])
     assert abs(meter.avg - sample_data.mean()) < EPSILON
 
+
 def test_inception():
     inc = models.inception_v3()
     assert inc is not None
+
 
 def test_inception_v3_s():
     inc = models.inception_v3_s()
@@ -75,6 +80,7 @@ def test_inception_v3_s():
     with pytest.warns(Warning):
         inc = models.inception_v3_s(pretrained=True)
         assert not inc is None
+
 
 def test_inception_v3_xs():
     inc = models.inception_v3_xs()
@@ -102,7 +108,7 @@ def test_resnet():
 def test_performance_meters(data_labels, data_outputs):
     num_correct_all = ((data_outputs > 0).numpy() == data_labels.numpy()).all(axis=1).sum()
     num_correct_single = ((data_outputs > 0).numpy() == data_labels.numpy()).sum(axis=0)
-    
+
     fake_labels = data_labels - 0.5
     num_correct = eye2you.meter_functions.all_or_nothing_performance(data_labels, fake_labels)
     assert num_correct == len(data_labels)
@@ -120,10 +126,11 @@ def test_performance_meters(data_labels, data_outputs):
         assert num_correct <= len(data_labels)
         assert num_correct == num_correct_single[ii]
 
+
 def test_performance_meters_tuple(data_labels, data_outputs):
     num_correct_all = ((data_outputs > 0).numpy() == data_labels.numpy()).all(axis=1).sum()
     num_correct_single = ((data_outputs > 0).numpy() == data_labels.numpy()).sum(axis=0)
-    
+
     fake_labels = data_labels - 0.5
     num_correct = eye2you.meter_functions.all_or_nothing_performance(data_labels, (fake_labels, 0))
     assert num_correct == len(data_labels)
@@ -166,24 +173,26 @@ def test_image_reading():
     assert not img is None
     assert isinstance(img, Image.Image)
 
+
 def test_data_reading():
     path = LOCAL_DIR / 'data'
     classes, class_to_idx = eye2you.io_helper.find_classes(path)
-    assert len(classes)==NUMBER_OF_CLASSES
-    assert len(class_to_idx)==NUMBER_OF_CLASSES
+    assert len(classes) == NUMBER_OF_CLASSES
+    assert len(class_to_idx) == NUMBER_OF_CLASSES
     for ii in range(NUMBER_OF_CLASSES):
-        assert class_to_idx[classes[ii]]==ii
-    
+        assert class_to_idx[classes[ii]] == ii
+
     class_to_idx['nonexisting_class'] = 2
     images = eye2you.io_helper.make_dataset(path, class_to_idx, eye2you.io_helper.IMG_EXTENSIONS)
-    assert len(images)==NUMBER_OF_IMAGES
+    assert len(images) == NUMBER_OF_IMAGES
+
 
 @patch('eye2you.io_helper.sys')
 def test_data_reading_pre35(mock_sys):
     path = LOCAL_DIR / 'data'
-    type(mock_sys).version_info = PropertyMock(return_value=(3,4))
+    type(mock_sys).version_info = PropertyMock(return_value=(3, 4))
     classes, class_to_idx = eye2you.io_helper.find_classes(path)
-    assert len(classes)==NUMBER_OF_CLASSES
-    assert len(class_to_idx)==NUMBER_OF_CLASSES
+    assert len(classes) == NUMBER_OF_CLASSES
+    assert len(class_to_idx) == NUMBER_OF_CLASSES
     for ii in range(NUMBER_OF_CLASSES):
-        assert class_to_idx[classes[ii]]==ii
+        assert class_to_idx[classes[ii]] == ii

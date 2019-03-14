@@ -6,8 +6,10 @@ from PIL import Image
 
 from .RetinaChecker import RetinaChecker
 
+
 def PIL_to_cv2(img):
     return np.array(img)
+
 
 def cv2_to_PIL(img, min_val=None, max_val=None):
     if min_val is None:
@@ -22,12 +24,15 @@ def cv2_to_PIL(img, min_val=None, max_val=None):
 
 
 features_blobs = []
+
+
 def hook_feature(_module, _input, out):
     features_blobs.append(out.data.cpu().numpy())
 
-def returnCAM(feature_conv, weight_softmax, class_idx, size_upsample = (256, 256), inter=cv2.INTER_LINEAR):
+
+def returnCAM(feature_conv, weight_softmax, class_idx, size_upsample=(256, 256), inter=cv2.INTER_LINEAR):
     # generate the class activation maps upsample to 256x256
-    
+
     _, nc, h, w = feature_conv.shape
     output_cam = []
     for idx in class_idx:
@@ -42,6 +47,7 @@ def returnCAM(feature_conv, weight_softmax, class_idx, size_upsample = (256, 256
             cam = cv2.resize(cam, size_upsample, interpolation=inter)
         output_cam.append(cam)
     return output_cam
+
 
 class Service():
 
@@ -84,8 +90,8 @@ class Service():
         finalconv_name = list(self.retina_checker.model._modules.keys())[-2]  #pylint: disable=protected-access
         # hook the feature extractor
 
-        self.retina_checker.model._modules.get(finalconv_name).register_forward_hook(hook_feature) #pylint: disable=protected-access
-    
+        self.retina_checker.model._modules.get(finalconv_name).register_forward_hook(hook_feature)  #pylint: disable=protected-access
+
     def classify_image(self, image):
         if not isinstance(image, Image.Image):
             raise ValueError('Only PIL images supported by now')
@@ -102,19 +108,23 @@ class Service():
         with torch.no_grad():
             output = self.retina_checker.model(x_input.to(self.retina_checker.device))
             prediction = torch.nn.Sigmoid()(output).detach().cpu().numpy()
-        
+
         return prediction
-    
+
     def get_largest_prediction(self, image):
         pred = self.classify_image(image)
         return pred.argmax()
 
-    
-    def get_class_activation_map(self, image, single_cam=None, as_pil_image=True, min_threshold=None, max_threshold=None):
+    def get_class_activation_map(self,
+                                 image,
+                                 single_cam=None,
+                                 as_pil_image=True,
+                                 min_threshold=None,
+                                 max_threshold=None):
         # get the softmax weight
         params = list(self.retina_checker.model.parameters())
         weight_softmax = np.squeeze(params[-2].data.detach().cpu().numpy())
-        
+
         # calculating the features_blobs
         self.classify_image(image)
 
@@ -126,7 +136,7 @@ class Service():
             idx = single_cam
         else:
             raise ValueError('single_cam not recognized as None, int, or tuple')
-        
+
         CAMs = returnCAM(features_blobs[-1], weight_softmax, idx, (self.model_image_size, self.model_image_size))
         if as_pil_image:
             for ii, cam in enumerate(CAMs):
@@ -137,7 +147,7 @@ class Service():
         if camId is None:
             camId = self.get_largest_prediction(image)
         CAMs = self.get_class_activation_map(image, single_cam=camId, as_pil_image=False)
-        
+
         # scaling CAM to input image size
         cam_mask = cv2.resize(CAMs[0], dsize=image.size, interpolation=cv2.INTER_CUBIC)
 
@@ -153,11 +163,10 @@ class Service():
         _, contours, _ = cv2.findContours(cam_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         return contours
-        
-    
+
     def __str__(self):
         desc = 'medAI Service:\n'
         desc += 'Loaded from {}\n'.format(self.checkpoint)
-        desc += 'RetinaChecker:\n' + self.retina_checker._str_core_info() # pylint disable:protected-access
+        desc += 'RetinaChecker:\n' + self.retina_checker._str_core_info()  # pylint disable:protected-access
         desc += 'Transform:\n' + str(self.transform)
         return desc

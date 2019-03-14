@@ -8,8 +8,11 @@ from PIL import Image
 import numpy as np
 
 features_blobs = []
+
+
 def hook_feature(_module, _input, out, ii):
     features_blobs[ii].append(out.data.cpu().numpy())
+
 
 class MEService(Service):
 
@@ -21,15 +24,15 @@ class MEService(Service):
         self.device = device
         if mixture_checkpoint is not None:
             self.initialize()
-        
-    def initialize(self, device=None):
+
+    def initialize(self):
         if self.checkpoint is None:
             raise ValueError('checkpoint attribute must be set')
 
         data = torch.load(self.checkpoint, map_location=self.device)
         if 'models' not in data.keys() or 'config' not in data.keys() or 'classes' not in data.keys():
             raise ValueError('Checkpoint must contain models, config, and classes keys')
-            
+
         self.number_of_experts = len(data['models'])
         self.retina_checker = []
         self.config = configparser.ConfigParser()
@@ -62,7 +65,8 @@ class MEService(Service):
             torchvision.transforms.Resize(int(self.model_image_size * self.test_image_size_overscaling)),
             torchvision.transforms.CenterCrop(self.model_image_size),
             torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize(self.retina_checker[0].normalize_mean, self.retina_checker[0].normalize_std)
+            torchvision.transforms.Normalize(self.retina_checker[0].normalize_mean,
+                                             self.retina_checker[0].normalize_std)
         ])
 
     def _classify(self, x_input):

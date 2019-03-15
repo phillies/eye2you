@@ -38,12 +38,13 @@ def test_classify(default_service):
     assert isinstance(img, Image.Image)
     prediction = default_service.classify_image(img)
     assert prediction is not None
+    assert len(prediction) == 2
     max_pred = default_service.get_largest_prediction(img)
-    assert prediction.max() == max_pred
+    assert prediction.argmax() == max_pred
 
     img2 = eye2you.io_helper.PIL_to_cv2(img)
-    assert isinstance(img, np.ndarray)
-    prediction2 = default_service.classify_image(img)
+    assert isinstance(img2, np.ndarray)
+    prediction2 = default_service.classify_image(img2)
     assert np.testing.all_close(prediction, prediction2)
 
 

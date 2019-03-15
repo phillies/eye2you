@@ -1,9 +1,15 @@
 # pylint: disable=redefined-outer-name
-import pytest
-import numpy as np
-import torch
+import os
 import configparser
+import pathlib
+
+import numpy as np
+import pytest
+import torch
+
 from eye2you import RetinaChecker
+
+LOCAL_DIR = pathlib.Path(os.path.dirname(os.path.realpath(__file__)))
 
 
 @pytest.fixture(scope='module')
@@ -14,8 +20,8 @@ def example_config():
     [hyperparameter]
 
     [files]
-    train file = ./images/label.csv
-    train root = ./images/data/
+    train file = ./data.csv
+    train root = ./data/
 
     [transform]
     [output]
@@ -42,6 +48,9 @@ def retina_checker(example_config):
     # create the checker class and initialize internal variables
     rc = RetinaChecker()
     rc.initialize(config)
+    rc.train_file = LOCAL_DIR / rc.train_file
+    rc.train_root = LOCAL_DIR / rc.train_root
+    rc.load_datasets(0.5)
 
     # Initialize the model
     rc.initialize_model()

@@ -22,7 +22,6 @@ class RetinaChecker():
     def __init__(self):
         self.device = None
         self.config = None
-        self.config_string = None
 
         self.model = None
         self.model_name = None
@@ -71,6 +70,15 @@ class RetinaChecker():
             return None
         else:
             return (self.normalize_mean, self.normalize_std)
+
+    @property
+    def config_string(self):
+        if self.config is None:
+            return None
+        else:
+            with io.StringIO() as fp:
+                self.config.write(fp)
+                return fp.getvalue()
 
     def __str__(self):
         desc = 'RetinaChecker\n'
@@ -330,7 +338,6 @@ class RetinaChecker():
             test_accuracy {torch.Array} -- tensor of test accuracy
             test_confusion {torch.Array} -- tensor of confusion matrices
         """
-        self._update_config_string()
 
         save_dict = {
             'epoch': self.epoch,
@@ -631,8 +638,3 @@ class RetinaChecker():
         sampler = torch.utils.data.WeightedRandomSampler(sampling_weights, num_samples, True)
         return sampler
 
-    def _update_config_string(self):
-        if self.config is not None:
-            with io.StringIO() as fp:
-                self.config.write(fp)
-                self.config_string = fp.getvalue()

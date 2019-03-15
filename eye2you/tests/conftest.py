@@ -65,3 +65,16 @@ def checkpoint_file(tmp_path_factory, retina_checker):
     filename = model_path / 'tmpmodel.ckpt'
     retina_checker.save_state(filename)
     return filename
+
+
+@pytest.fixture(scope='module')
+def multi_checkpoint_file(tmp_path_factory, retina_checker):
+    model_path = tmp_path_factory.mktemp('ckpt')
+    filename = model_path / 'me_model.ckpt'
+    models = []
+    config = retina_checker.config_string
+    classes = retina_checker.classes
+    models.append(retina_checker.model.state_dict)
+    models.append(retina_checker.model.state_dict)
+    torch.save({'models': models, 'config': config, 'classes': classes}, filename)
+    return filename

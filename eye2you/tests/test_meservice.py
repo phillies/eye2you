@@ -3,9 +3,8 @@ import pytest
 from eye2you import MEService
 
 
-def test_initialization():
-    filename = 'd:/ckpt/model_test.ckpt'
-    mes = MEService(filename)
+def test_initialization(multi_checkpoint_file):
+    mes = MEService(multi_checkpoint_file)
     assert mes is not None
     assert mes.number_of_experts == 2
     assert len(mes.retina_checker) == 2

@@ -79,9 +79,13 @@ class Service():
 
         self.retina_checker.model._modules.get(finalconv_name).register_forward_hook(hook_feature)  #pylint: disable=protected-access
 
-    def classify_image(self, image):
-        if not isinstance(image, Image.Image):
-            raise ValueError('Only PIL images supported by now')
+    def classify_image(self, img):
+        if isinstance(img, np.ndarray):
+            image = cv2_to_PIL(img)
+        elif isinstance(img, Image.Image):
+            image = img
+        else:
+            raise ValueError('Only PIL Image or numpy array supported')
 
         # Convert image to tensor
         x_input = self.transform(image)

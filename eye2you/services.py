@@ -68,9 +68,13 @@ class Service():
         self.transform = torchvision.transforms.Compose([
             torchvision.transforms.Resize(int(self.model_image_size * self.test_image_size_overscaling)),
             torchvision.transforms.CenterCrop(self.model_image_size),
-            torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize(self.retina_checker.normalize_mean, self.retina_checker.normalize_std)
+            torchvision.transforms.ToTensor()
         ])
+        if self.retina_checker.normalize_factors is not None:
+            self.transform = torchvision.transforms.Compose([
+                self.transform,
+                torchvision.transforms.Normalize(self.retina_checker.normalize_mean, self.retina_checker.normalize_std)
+            ])
 
         # This is the initialization of the class activation map extraction
         # Yes, accessing protected members is not a good style. We'll fix that later ;-)

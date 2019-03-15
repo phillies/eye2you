@@ -46,7 +46,6 @@ class RetinaChecker():
         self.classes = None
         self.normalize_mean = None
         self.normalize_std = None
-        self.normalize_factors = None
         self.image_size = None
         self.test_scale_factor = 1.1
 
@@ -65,6 +64,13 @@ class RetinaChecker():
     @property
     def num_classes(self):
         return len(self.classes)
+
+    @property
+    def normalize_factors(self):
+        if self.normalize_mean is None or self.normalize_std is None:
+            return None
+        else:
+            return (self.normalize_mean, self.normalize_std)
 
     def __str__(self):
         desc = 'RetinaChecker\n'

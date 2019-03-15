@@ -1,7 +1,6 @@
-from .PandasDataset import PandasDataset
+from .datasets import PandasDataset
 from . import models
-from .RetinaChecker import RetinaChecker
-from .Service import Service
-from .MEService import MEService
+from .checker import RetinaChecker
+from .services import Service, MEService
 
 __all__ = ['PandasDataset', 'RetinaChecker', 'Service', 'models', 'MEService']

@@ -7,24 +7,8 @@ import torch
 import torchvision
 from PIL import Image
 
-from .RetinaChecker import RetinaChecker
-
-
-def PIL_to_cv2(img):
-    return np.array(img)
-
-
-def cv2_to_PIL(img, min_val=None, max_val=None):
-    if min_val is None:
-        min_val = img.min()
-    if max_val is None:
-        max_val = img.max()
-    img_scale = img - min_val
-    img_scale = img_scale / (max_val - min_val)
-    img_scale = (img_scale * 255).astype(np.ubyte)
-    pil_img = Image.fromarray(img_scale)
-    return pil_img
-
+from .checker import RetinaChecker
+from .io_helper import cv2_to_PIL, PIL_to_cv2
 
 FEATURE_BLOBS = []
 

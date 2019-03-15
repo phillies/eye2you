@@ -11,7 +11,7 @@ import torch.nn as nn
 import eye2you.models as models
 import torchvision.transforms as transforms
 
-from .PandasDataset import PandasDataset
+from .datasets import PandasDataset
 from .meter_functions import AccuracyMeter, AverageMeter, all_or_nothing_performance
 
 

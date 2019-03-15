@@ -177,9 +177,6 @@ class RetinaChecker():
         if normalize_std is not None:
             self.normalize_std = json.loads(normalize_std)
 
-        if normalize_mean is not None and normalize_std is not None:
-            self.normalize_factors = [self.normalize_mean, self.normalize_std]
-
         self.model_pretrained = self.config['network'].getboolean('pretrained', False)
 
         self.learning_rate = self.config['hyperparameter'].getfloat('learning rate', 0.001)

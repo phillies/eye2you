@@ -13,7 +13,7 @@ from .io_helper import cv2_to_PIL, PIL_to_cv2
 FEATURE_BLOBS = []
 
 
-def hook_feature(_module, _input, out):
+def hook_feature(_module, _input, out, ii=0):
     FEATURE_BLOBS.append(out.data.cpu().numpy())
 
 
@@ -228,5 +228,11 @@ class MEService(Service):
             for ii in range(self.number_of_experts):
                 output = self.retina_checker[ii].model(x_input.to(self.retina_checker[ii].device))
                 pred.append(torch.nn.Sigmoid()(output).detach().cpu().numpy())
-            prediction = np.array(pred).mean(0)
+            prediction = np.array(pred)
         return prediction
+
+    def get_largest_prediction(self, image):
+        pred = self.classify_image(image)
+        max_preds = pred.argmax(axis=1)
+        count, _ = np.histogram(max_preds, np.arange(0, pred.shape[1]+1))
+        return count.argmax()

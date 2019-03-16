@@ -9,7 +9,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import eye2you.models as models
-import torchvision.transforms as transforms
+import torchvision.transforms as transforms  # pylint: disable=unresolved-import
 
 from .datasets import PandasDataset
 from .meter_functions import AccuracyMeter, AverageMeter, all_or_nothing_performance
@@ -455,9 +455,10 @@ class RetinaChecker():
         color_jitter = transforms.RandomApply(
             [transforms.ColorJitter(brightness=brightness, contrast=contrast, saturation=saturation, hue=hue)])
 
-        randcrop = transforms.RandomChoice(
-            (transforms.RandomResizedCrop(size=self.image_size, scale=(min_scale, max_scale), ratio=(1, 1)),
-             transforms.RandomResizedCrop(size=self.image_size, scale=(min_scale, 0.4), ratio=(0.8, 1.25))))
+        #randcrop = transforms.RandomChoice(
+        #    (transforms.RandomResizedCrop(size=self.image_size, scale=(min_scale, max_scale), ratio=(1, 1)),
+        #     transforms.RandomResizedCrop(size=self.image_size, scale=(min_scale, 0.4), ratio=(0.8, 1.25))))
+        randcrop = transforms.RandomResizedCrop(size=self.image_size, scale=(min_scale, max_scale), ratio=(1, 1))
 
         transform_list = []
         if brightness != 0 or contrast != 0 or saturation != 0 or hue != 0:

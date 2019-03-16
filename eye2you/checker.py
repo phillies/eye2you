@@ -231,7 +231,8 @@ class RetinaChecker():
         self.model = model_loader(pretrained=self.model_pretrained, **kwargs)
         num_ftrs = self.model.fc.in_features
         self.model.fc = nn.Linear(num_ftrs, self.num_classes)
-        self.model.AuxLogits.fc = nn.Linear(self.model.AuxLogits.fc.in_features, self.num_classes)
+        if hasattr(self.model, 'AuxLogits'):
+            self.model.AuxLogits.fc = nn.Linear(self.model.AuxLogits.fc.in_features, self.num_classes)
         self.model = self.model.to(self.device)
 
     def load_datasets(self, test_size=0.1):
@@ -637,4 +638,3 @@ class RetinaChecker():
 
         sampler = torch.utils.data.WeightedRandomSampler(sampling_weights, num_samples, True)
         return sampler
-

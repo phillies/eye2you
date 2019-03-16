@@ -41,6 +41,58 @@ def test_create_checker(tmp_path, example_config):
     assert os.path.isfile(tmp_path / 'tmpmodel.ckpt')
 
 
+def test_create_checker_s(tmp_path, example_config):
+    # Reading configuration file
+    config = configparser.ConfigParser()
+    config.read_string(example_config)
+    config['network']['model'] = 'inception_v3_s'
+
+    # create the checker class and initialize internal variables
+    rc = RetinaChecker()
+    assert not rc.initialized
+    assert str(rc).count('not initialized') > 0
+
+    rc.initialize(config)
+
+    assert rc.initialized
+    assert str(rc).count('not initialized') == 0
+
+    # Initialize the model
+    rc.initialize_model()
+    rc.initialize_criterion()
+    rc.initialize_optimizer()
+
+    assert not rc.model is None
+    assert not rc.criterion is None
+    assert not rc.optimizer is None
+
+
+def test_create_checker_xs(tmp_path, example_config):
+    # Reading configuration file
+    config = configparser.ConfigParser()
+    config.read_string(example_config)
+    config['network']['model'] = 'inception_v3_xs'
+
+    # create the checker class and initialize internal variables
+    rc = RetinaChecker()
+    assert not rc.initialized
+    assert str(rc).count('not initialized') > 0
+
+    rc.initialize(config)
+
+    assert rc.initialized
+    assert str(rc).count('not initialized') == 0
+
+    # Initialize the model
+    rc.initialize_model()
+    rc.initialize_criterion()
+    rc.initialize_optimizer()
+
+    assert not rc.model is None
+    assert not rc.criterion is None
+    assert not rc.optimizer is None
+
+
 def test_loading_data():
     #assert False #TODO: implement me
     pass
@@ -116,16 +168,19 @@ def test_train_and_validation():
     assert confusion is not None
 
 
-def test_validate():
-    #assert False #TODO: implement me
-    pass
-
-
-def test_printing():
+def test_printing(retina_checker, retina_checker_s, retina_checker_xs):
     # Pretrained
     # with dataset and workers
     #assert False #TODO: implement me
-    pass
+    print(retina_checker)
+    retina_checker.train()
+    retina_checker.validate()
+    print(retina_checker_s)
+    retina_checker_s.train()
+    retina_checker_s.validate()
+    print(retina_checker_xs)
+    retina_checker_xs.train()
+    retina_checker_xs.validate()
 
 
 def test_initialize_unknown_config():

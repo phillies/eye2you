@@ -44,6 +44,7 @@ def retina_checker(example_config):
     # Reading configuration file
     config = configparser.ConfigParser()
     config.read_string(example_config)
+    config['network']['pretrained'] = 'True'
 
     # create the checker class and initialize internal variables
     rc = RetinaChecker()
@@ -51,6 +52,55 @@ def retina_checker(example_config):
     rc.train_file = LOCAL_DIR / rc.train_file
     rc.train_root = LOCAL_DIR / rc.train_root
     rc.load_datasets(0.5)
+    rc.create_dataloader()
+
+    # Initialize the model
+    rc.initialize_model()
+    rc.initialize_criterion()
+    rc.initialize_optimizer()
+    return rc
+
+
+@pytest.fixture
+def retina_checker_s(example_config):
+    # Reading configuration file
+    config = configparser.ConfigParser()
+    config.read_string(example_config)
+    config['network']['model'] = 'inception_v3_s'
+
+    # create the checker class and initialize internal variables
+    rc = RetinaChecker()
+    rc.initialize(config)
+    rc.train_file = LOCAL_DIR / rc.train_file
+    rc.train_root = LOCAL_DIR / rc.train_root
+    rc.test_file = rc.train_file
+    rc.test_root = rc.train_root
+    rc.load_datasets()
+    rc.create_dataloader()
+
+    # Initialize the model
+    rc.initialize_model()
+    rc.initialize_criterion()
+    rc.initialize_optimizer()
+    return rc
+
+
+@pytest.fixture
+def retina_checker_xs(example_config):
+    # Reading configuration file
+    config = configparser.ConfigParser()
+    config.read_string(example_config)
+    config['network']['model'] = 'inception_v3_xs'
+
+    # create the checker class and initialize internal variables
+    rc = RetinaChecker()
+    rc.initialize(config)
+    rc.train_file = LOCAL_DIR / rc.train_file
+    rc.train_root = LOCAL_DIR / rc.train_root
+    rc.test_file = rc.train_file
+    rc.test_root = rc.train_root
+    rc.load_datasets()
+    rc.create_dataloader()
 
     # Initialize the model
     rc.initialize_model()

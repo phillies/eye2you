@@ -8,6 +8,7 @@ import torchvision
 from PIL import Image
 
 from .checker import RetinaChecker
+from .datasets import PandasDataset
 from .io_helper import cv2_to_PIL, PIL_to_cv2
 
 FEATURE_BLOBS = []
@@ -44,6 +45,8 @@ class Service():
         self.transform = None
         self.model_image_size = None
         self.test_image_size_overscaling = None
+        self.last_dataset = None
+        self.last_loader = None
         if checkpoint is not None:
             self.initialize()
 
@@ -98,6 +101,53 @@ class Service():
         x_input = x_input.unsqueeze(0)
 
         return self._classify(x_input).squeeze()
+
+    def validate(self, file_list, root=''):
+        dataset = PandasDataset(source=file_list, mode='csv', root=root, transform=self.transform)
+
+        test_loader = torch.utils.data.DataLoader(
+            dataset=dataset,
+            batch_size=self.retina_checker.config['hyperparameter'].getint('batch size', 32),
+            shuffle=False,
+            sampler=None,
+            num_workers=0)
+
+        self.last_dataset = dataset
+        self.last_loader = test_loader
+
+        return self.retina_checker.validate(test_loader=test_loader)
+
+    def classify_images(self, file_list, root=''):
+        dataset = PandasDataset(source=file_list, mode='csv', root=root, transform=self.transform)
+
+        test_loader = torch.utils.data.DataLoader(
+            dataset=dataset,
+            batch_size=self.retina_checker.config['hyperparameter'].getint('batch size', 32),
+            shuffle=False,
+            sampler=None,
+            num_workers=0)
+
+        result = np.empty((len(dataset), self.retina_checker.num_classes))
+        self.retina_checker.model.eval()
+        # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)
+        with torch.no_grad():
+            counter = 0
+            for images, labels in test_loader:
+                images = images.to(self.retina_checker.device)
+                labels = labels.to(self.retina_checker.device)
+
+                outputs = self.retina_checker.model(images)
+                loss = self.retina_checker.criterion(outputs, labels)
+
+                predicted = torch.nn.Sigmoid()(outputs).round()
+                num_images = predicted.size()[0]
+                result[counter:counter + num_images, :] = predicted.cpu().numpy()
+                counter += num_images
+
+        self.last_dataset = dataset
+        self.last_loader = test_loader
+
+        return result
 
     def _classify(self, x_input):
         with torch.no_grad():
@@ -234,5 +284,5 @@ class MEService(Service):
     def get_largest_prediction(self, image):
         pred = self.classify_image(image)
         max_preds = pred.argmax(axis=1)
-        count, _ = np.histogram(max_preds, np.arange(0, pred.shape[1]+1))
+        count, _ = np.histogram(max_preds, np.arange(0, pred.shape[1] + 1))
         return count.argmax()

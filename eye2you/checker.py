@@ -19,8 +19,8 @@ class RetinaChecker():
     """Deep learning model
     """
 
-    def __init__(self):
-        self.device = None
+    def __init__(self, device=None):
+        self.device = device
         self.config = None
 
         self.model = None

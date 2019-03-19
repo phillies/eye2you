@@ -39,7 +39,7 @@ def returnCAM(feature_conv, weight_softmax, class_idx, size_upsample=(256, 256),
 
 class Service():
 
-    def __init__(self, checkpoint=None):
+    def __init__(self, checkpoint=None, device=None):
         self.retina_checker = None
         self.checkpoint = checkpoint
         self.transform = None
@@ -47,13 +47,14 @@ class Service():
         self.test_image_size_overscaling = None
         self.last_dataset = None
         self.last_loader = None
+        self.device = device
         if checkpoint is not None:
             self.initialize()
 
     def initialize(self):
         if self.checkpoint is None:
             raise ValueError('checkpoint cannot be None')
-        self.retina_checker = RetinaChecker()
+        self.retina_checker = RetinaChecker(self.device)
         self.retina_checker.initialize(self.checkpoint)
         self.retina_checker.initialize_model()
         self.retina_checker.initialize_criterion()
@@ -134,10 +135,10 @@ class Service():
             counter = 0
             for images, labels in test_loader:
                 images = images.to(self.retina_checker.device)
-                labels = labels.to(self.retina_checker.device)
+                #labels = labels.to(self.retina_checker.device)
 
                 outputs = self.retina_checker.model(images)
-                loss = self.retina_checker.criterion(outputs, labels)
+                #loss = self.retina_checker.criterion(outputs, labels)
 
                 predicted = torch.nn.Sigmoid()(outputs).round()
                 num_images = predicted.size()[0]
@@ -242,7 +243,7 @@ class MEService(Service):
         self.config.read_string(data['config'])
 
         for ii in range(self.number_of_experts):
-            rc = RetinaChecker()
+            rc = RetinaChecker(self.device)
             rc.initialize(self.config)
             rc.classes = data['classes']
             rc.initialize_model()

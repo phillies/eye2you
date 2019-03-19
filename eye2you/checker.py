@@ -379,10 +379,14 @@ class RetinaChecker():
             #else:
             checkpoint = torch.load(filename, map_location=self.device)
 
-            self.start_epoch = checkpoint['epoch']
+            self.start_epoch = 0
+            if 'epoch' in checkpoint:
+                self.start_epoch = checkpoint['epoch']
             self.epoch = self.start_epoch
+
             self.model.load_state_dict(checkpoint['state_dict'], strict=False)
-            if self.optimizer is not None:
+
+            if self.optimizer is not None and 'optimizer' in checkpoint:
                 self.optimizer.load_state_dict(checkpoint['optimizer'])
                 if 'scheduler' in checkpoint:
                     self.scheduler.load_state_dict(checkpoint['scheduler'])
@@ -397,7 +401,7 @@ class RetinaChecker():
                         gamma=self.learning_rate_decay_gamma,
                         last_epoch=self.start_epoch)
 
-            print("=> loaded checkpoint '{}' (epoch {})".format(filename, checkpoint['epoch']))
+            print("=> loaded checkpoint '{}' (epoch {})".format(filename, self.start_epoch))
         except OSError as e:
             print("Exception occurred. Did not load model, starting from scratch.\n", e)
 

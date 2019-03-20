@@ -58,6 +58,8 @@ class RetinaChecker():
         self.learning_rate_decay_gamma = None
         self.learning_rate_decay_step_size = None
 
+        self.evaluate_performance = all_or_nothing_performance
+
         self.initialized = False
 
     @property
@@ -150,7 +152,7 @@ class RetinaChecker():
             except (configparser.MissingSectionHeaderError, UnicodeDecodeError):
                 try:
                     ckpt = torch.load(config, map_location='cpu')
-                    if 'config' in ckpt.keys():
+                    if 'config' in ckpt:
                         self.config.read_string(ckpt['config'])
                         self.classes = ckpt['classes']
                     else:
@@ -502,7 +504,7 @@ class RetinaChecker():
 
         return test_transform
 
-    def train(self, evaluate_performance=all_or_nothing_performance):
+    def train(self, evaluate_performance=None):
         '''Deep learning training function to optimize the network with all images in the train_loader.
         
         Returns:
@@ -516,6 +518,9 @@ class RetinaChecker():
         if self.train_loader is None:
             print('No training loader defined. Check configuration.')
             return
+        
+        if evaluate_performance is None:
+            evaluate_performance = self.evaluate_performance
 
         losses = AverageMeter()
         accuracy = AccuracyMeter()
@@ -557,7 +562,7 @@ class RetinaChecker():
         self.epoch += 1
         return losses, accuracy
 
-    def validate(self, test_loader=None, evaluate_performance=all_or_nothing_performance, confusion_matrix_label=None):
+    def validate(self, test_loader=None, evaluate_performance=None, confusion_matrix_label=None):
         '''Evaluates the model given the criterion and the data in test_loader
         
         Arguments:
@@ -579,6 +584,9 @@ class RetinaChecker():
 
         if confusion_matrix_label is None:
             confusion_matrix_label = min(self.num_classes - 1, 5)
+
+        if evaluate_performance is None:
+            evaluate_performance = self.evaluate_performance
 
         self.model.eval()  # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)
         with torch.no_grad():

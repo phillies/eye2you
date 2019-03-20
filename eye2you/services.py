@@ -1,3 +1,4 @@
+import sys
 import configparser
 import functools
 
@@ -158,8 +159,16 @@ class Service():
         return prediction
 
     def get_largest_prediction(self, image):
+        '''Returns the class index of the largest prediction
+        
+        Arguments:
+            image {PIL.Image.Image} -- PIL image to analyze
+        
+        Returns:
+            int -- class index of the largest prediction
+        '''
         pred = self.classify_image(image)
-        return pred.argmax()
+        return int(pred.argmax())
 
     def get_class_activation_map(self,
                                  image,
@@ -181,7 +190,8 @@ class Service():
         elif isinstance(single_cam, tuple) or isinstance(single_cam, list):
             idx = single_cam
         else:
-            raise ValueError('single_cam not recognized as None, int, or tuple')
+            raise ValueError('single_cam not recognized as None, int, or tuple: {} with type {}'.format(
+                single_cam, type(single_cam)))
 
         CAMs = returnCAM(FEATURE_BLOBS[-1], weight_softmax, idx, (self.model_image_size, self.model_image_size))
         if as_pil_image:
@@ -189,7 +199,14 @@ class Service():
                 CAMs[ii] = cv2_to_PIL(cam, min_threshold, max_threshold)
         return CAMs
 
-    def get_contour(self, image, threshold=10, camId=None, crop_black_borders=True, border_threshold=20):
+    def get_contour(self, img, threshold=10, camId=None, crop_black_borders=True, border_threshold=20):
+        if isinstance(img, np.ndarray):
+            image = cv2_to_PIL(img)
+        elif isinstance(img, Image.Image):
+            image = img
+        else:
+            raise ValueError('Only PIL Image or numpy array supported')
+
         if camId is None:
             camId = self.get_largest_prediction(image)
         CAMs = self.get_class_activation_map(image, single_cam=camId, as_pil_image=False)
@@ -206,7 +223,18 @@ class Service():
         cam_mask = ((cam_mask > threshold) * 255).astype(np.ubyte)
 
         # Contour detection
-        _, contours, _ = cv2.findContours(cam_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours_return = cv2.findContours(cam_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        # opencv changed return value from (image, contours, hierarchy) in 3.4 to (contours, hierarchy) in 4.0
+        if len(contours_return) == 3:
+            _, contours, _ = contours_return
+        if len(contours_return) == 2:
+            contours, _ = contours_return
+        else:
+            message = '''cv2.findCountours() returned {} values. This version can only deal with 2 or 3 return values (tested on cv2 3.4 and 4.0).
+            Your version: {}
+            Please submit a bug report with your opencv version and/or switch to 3.4 or 4.0 in the meantime.'''.format(
+                len(contours_return), cv2.__version__)
+            raise RuntimeError(message)
 
         return contours
 
@@ -216,6 +244,16 @@ class Service():
         desc += 'RetinaChecker:\n' + self.retina_checker._str_core_info()  # pylint disable:protected-access
         desc += 'Transform:\n' + str(self.transform)
         return desc
+
+    def print_module_versions():
+        versions = ''
+        versions += 'Python: ' + sys.version
+        versions += '\nNumpy: ' + np.__version__
+        versions += '\nPIL: ' + Image.__version__
+        versions += '\nTorch: ' + torch.__version__
+        versions += '\nTorchvision: ' + torchvision.__version__
+        versions += '\nOpenCV: ' + cv2.__version__
+        print(versions)
 
 
 class MEService(Service):
@@ -283,7 +321,15 @@ class MEService(Service):
         return prediction
 
     def get_largest_prediction(self, image):
+        '''Returns the class index of the largest prediction
+        
+        Arguments:
+            image {PIL.Image.Image} -- PIL image to analyze
+        
+        Returns:
+            int -- class index of the largest prediction
+        '''
         pred = self.classify_image(image)
         max_preds = pred.argmax(axis=1)
         count, _ = np.histogram(max_preds, np.arange(0, pred.shape[1] + 1))
-        return count.argmax()
+        return int(count.argmax())

@@ -119,7 +119,7 @@ class Service():
 
         return self.retina_checker.validate(test_loader=test_loader)
 
-    def classify_images(self, file_list, root=''):
+    def classify_images(self, file_list, root='', output_return=None):
         dataset = PandasDataset(source=file_list, mode='csv', root=root, transform=self.transform)
 
         test_loader = torch.utils.data.DataLoader(
@@ -130,6 +130,7 @@ class Service():
             num_workers=0)
 
         result = np.empty((len(dataset), self.retina_checker.num_classes))
+        output_buffer = np.empty((len(dataset), self.retina_checker.num_classes))
         self.retina_checker.model.eval()
         # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)
         with torch.no_grad():
@@ -144,18 +145,21 @@ class Service():
                 predicted = torch.nn.Sigmoid()(outputs).round()
                 num_images = predicted.size()[0]
                 result[counter:counter + num_images, :] = predicted.cpu().numpy()
+                output_buffer[counter:counter + num_images, :] = outputs.cpu().numpy()
                 counter += num_images
 
         self.last_dataset = dataset
         self.last_loader = test_loader
-
+        if isinstance(output_return, list):
+            output_return.append(output_buffer)
         return result
 
-    def _classify(self, x_input):
+    def _classify(self, x_input, output_return=None):
         with torch.no_grad():
             output = self.retina_checker.model(x_input.to(self.retina_checker.device))
             prediction = torch.nn.Sigmoid()(output).detach().cpu().numpy()
-
+            if isinstance(output_return, list):
+                output_return.append(output)
         return prediction
 
     def get_largest_prediction(self, image):

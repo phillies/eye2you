@@ -2,6 +2,7 @@ import os
 import sys
 import numpy as np
 from PIL import Image
+import torch
 
 # Functions partially copied from torchvision
 
@@ -105,3 +106,30 @@ def cv2_to_PIL(img, min_val=None, max_val=None):
     img_scale = (img_scale * 255).astype(np.ubyte)
     pil_img = Image.fromarray(img_scale)
     return pil_img
+
+
+def merge_models_from_checkpoints(checkpoints, device='cpu'):
+    '''Extracts the model state_dict from a list of RetinaChecker checkpoints
+    and returns the dictionaly with all models, example config and classes.
+    Returns the first config and classes it finds. Make sure the checkpoints are
+    compatible. Otherwise somewhere an exception will rise.
+    
+    Arguments:
+        checkpoints {tuple} -- Filenames of RetinaChecker checkpoints (or torch checkpoints)
+
+    Returns
+        dict -- Dictionary with models, config, and classes
+    '''
+    models = []
+    config = None
+    classes = None
+    for filename in checkpoints:
+        data = torch.load(filename, map_location=device)
+        if 'state_dict' in data.keys():
+            models.append(data['state_dict'])
+        if config is None and 'config' in data.keys():
+            config = data['config']
+        if classes is None and 'classes' in data.keys():
+            classes = data['classes']
+
+    return {'models': models, 'config': config, 'classes': classes}

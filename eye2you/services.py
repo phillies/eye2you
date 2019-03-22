@@ -10,7 +10,7 @@ from PIL import Image
 
 from .checker import RetinaChecker
 from .datasets import PandasDataset
-from .io_helper import cv2_to_PIL, PIL_to_cv2
+from .io_helper import cv2_to_PIL, PIL_to_cv2, merge_models_from_checkpoints
 
 FEATURE_BLOBS = []
 
@@ -280,7 +280,10 @@ class MEService(Service):
         if self.checkpoint is None:
             raise ValueError('checkpoint attribute must be set')
 
-        data = torch.load(self.checkpoint, map_location=self.device)
+        if isinstance(self.checkpoint, (list, tuple)):
+            data = merge_models_from_checkpoints(self.checkpoint, self.device)
+        else:
+            data = torch.load(self.checkpoint, map_location=self.device)
         if 'models' not in data.keys() or 'config' not in data.keys() or 'classes' not in data.keys():
             raise ValueError('Checkpoint must contain models, config, and classes keys')
 

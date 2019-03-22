@@ -49,6 +49,7 @@ class Service():
         self.last_dataset = None
         self.last_loader = None
         self.device = device
+        self.feature_extractor_hook = None
         if checkpoint is not None:
             self.initialize()
 
@@ -83,10 +84,16 @@ class Service():
 
         # This is the initialization of the class activation map extraction
         # Yes, accessing protected members is not a good style. We'll fix that later ;-)
-        finalconv_name = list(self.retina_checker.model._modules.keys())[-2]  #pylint: disable=protected-access
-        # hook the feature extractor
+        self.finalconv_name = list(self.retina_checker.model._modules.keys())[-2]  #pylint: disable=protected-access
 
-        self.retina_checker.model._modules.get(finalconv_name).register_forward_hook(hook_feature)  #pylint: disable=protected-access
+    def hook_feature_extractor(self):
+        # hook the feature extractor
+        self.feature_extractor_hook = self.retina_checker.model._modules.get(self.finalconv_name).register_forward_hook(
+            hook_feature)  #pylint: disable=protected-access
+
+    def unhook_feature_extractor(self):
+        if self.feature_extractor_hook is not None:
+            self.feature_extractor_hook.remove()
 
     def classify_image(self, img):
         if isinstance(img, np.ndarray):
@@ -104,30 +111,26 @@ class Service():
 
         return self._classify(x_input).squeeze()
 
-    def validate(self, file_list, root=''):
+    def validate(self, file_list, root='', num_workers=0, batch_size=None):
         dataset = PandasDataset(source=file_list, mode='csv', root=root, transform=self.transform)
+        if batch_size is None:
+            batch_size = self.retina_checker.config['hyperparameter'].getint('batch size', 32)
 
         test_loader = torch.utils.data.DataLoader(
-            dataset=dataset,
-            batch_size=self.retina_checker.config['hyperparameter'].getint('batch size', 32),
-            shuffle=False,
-            sampler=None,
-            num_workers=0)
+            dataset=dataset, batch_size=batch_size, shuffle=False, sampler=None, num_workers=num_workers)
 
         self.last_dataset = dataset
         self.last_loader = test_loader
 
         return self.retina_checker.validate(test_loader=test_loader)
 
-    def classify_images(self, file_list, root='', output_return=None):
+    def classify_images(self, file_list, root='', output_return=None, num_workers=0, batch_size=None):
         dataset = PandasDataset(source=file_list, mode='csv', root=root, transform=self.transform)
+        if batch_size is None:
+            batch_size = self.retina_checker.config['hyperparameter'].getint('batch size', 32)
 
         test_loader = torch.utils.data.DataLoader(
-            dataset=dataset,
-            batch_size=self.retina_checker.config['hyperparameter'].getint('batch size', 32),
-            shuffle=False,
-            sampler=None,
-            num_workers=0)
+            dataset=dataset, batch_size=batch_size, shuffle=False, sampler=None, num_workers=num_workers)
 
         result = np.empty((len(dataset), self.retina_checker.num_classes))
         output_buffer = np.empty((len(dataset), self.retina_checker.num_classes))
@@ -185,7 +188,9 @@ class Service():
         weight_softmax = np.squeeze(params[-2].data.detach().cpu().numpy())
 
         # calculating the FEATURE_BLOBS
+        self.hook_feature_extractor()
         self.classify_image(image)
+        self.unhook_feature_extractor()
 
         if single_cam is None:
             idx = np.arange(self.retina_checker.num_classes, dtype=np.int)
@@ -315,13 +320,17 @@ class MEService(Service):
                                              self.retina_checker[0].normalize_std)
         ])
 
-    def _classify(self, x_input):
+    def _classify(self, x_input, output_return=None):
         with torch.no_grad():
             pred = []
+            outputs = []
             for ii in range(self.number_of_experts):
                 output = self.retina_checker[ii].model(x_input.to(self.retina_checker[ii].device))
+                outputs.append(output)
                 pred.append(torch.nn.Sigmoid()(output).detach().cpu().numpy())
             prediction = np.array(pred)
+            if isinstance(output_return, list):
+                output_return.append(outputs)
         return prediction
 
     def get_largest_prediction(self, image):

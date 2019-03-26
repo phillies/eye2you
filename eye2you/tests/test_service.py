@@ -14,7 +14,7 @@ from eye2you import RetinaChecker
 LOCAL_DIR = pathlib.Path(os.path.dirname(os.path.realpath(__file__)))
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture
 def default_service(checkpoint_file):
     service = Service(checkpoint_file)
     return service

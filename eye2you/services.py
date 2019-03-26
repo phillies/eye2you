@@ -38,6 +38,11 @@ def returnCAM(feature_conv, weight_softmax, class_idx, size_upsample=(256, 256),
     return output_cam
 
 
+def majority_vote(predictions):
+    result = (np.count_nonzero(predictions, axis=2) > predictions.shape[2] / 2) * 1.0
+    return result
+
+
 class Service():
 
     def __init__(self, checkpoint=None, device=None):
@@ -65,6 +70,7 @@ class Service():
         self.retina_checker.model.eval()
 
         self.model_image_size = self.retina_checker.image_size
+        self.num_classes = self.retina_checker.num_classes
 
         # This is the factor that the image will be scaled to before cropping the center
         # for the model. Empirically a factor between 1.0 and 1.1 yielded the best results
@@ -132,8 +138,8 @@ class Service():
         test_loader = torch.utils.data.DataLoader(
             dataset=dataset, batch_size=batch_size, shuffle=False, sampler=None, num_workers=num_workers)
 
-        result = np.empty((len(dataset), self.retina_checker.num_classes))
-        output_buffer = np.empty((len(dataset), self.retina_checker.num_classes))
+        result = np.empty((len(dataset), self.num_classes))
+        output_buffer = np.empty((len(dataset), self.num_classes))
         self.retina_checker.model.eval()
         # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)
         with torch.no_grad():
@@ -193,7 +199,7 @@ class Service():
         self.unhook_feature_extractor()
 
         if single_cam is None:
-            idx = np.arange(self.retina_checker.num_classes, dtype=np.int)
+            idx = np.arange(self.num_classes, dtype=np.int)
         elif isinstance(single_cam, int):
             idx = [single_cam]
         elif isinstance(single_cam, tuple) or isinstance(single_cam, list):
@@ -303,12 +309,12 @@ class MEService(Service):
 
             # This is the initialization of the class activation map extraction
             finalconv_name = list(rc.model._modules.keys())[-2]
-            # hook the feature extractor
-            rc.model._modules.get(finalconv_name).register_forward_hook(functools.partial(hook_feature, ii=ii))
 
             self.retina_checker.append(rc)
 
         self.model_image_size = self.retina_checker[0].image_size
+        self.num_classes = len(data['classes'])
+        self.mixture_function = majority_vote
 
         # This is the factor that the image will be scaled to before cropping the center
         # for the model. Empirically a factor between 1.0 and 1.1 yielded the best results
@@ -349,3 +355,39 @@ class MEService(Service):
         max_preds = pred.argmax(axis=1)
         count, _ = np.histogram(max_preds, np.arange(0, pred.shape[1] + 1))
         return int(count.argmax())
+
+    def classify_images(self, file_list, root='', output_return=None, num_workers=0, batch_size=None):
+        dataset = PandasDataset(source=file_list, mode='csv', root=root, transform=self.transform)
+        if batch_size is None:
+            batch_size = self.retina_checker[0].config['hyperparameter'].getint('batch size', 32)
+
+        test_loader = torch.utils.data.DataLoader(
+            dataset=dataset, batch_size=batch_size, shuffle=False, sampler=None, num_workers=num_workers)
+
+        result = np.empty((len(dataset), self.num_classes))
+        output_buffer = np.empty((len(dataset), self.num_classes, self.number_of_experts))
+        for rc in self.retina_checker:
+            rc.model.eval()
+        # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)
+        with torch.no_grad():
+            counter = 0
+            for images, labels in test_loader:
+                images = images.to(self.device)
+                #labels = labels.to(self.retina_checker.device)
+
+                num_images = len(images)
+                all_pred = np.empty((num_images, self.num_classes, self.number_of_experts))
+                for (ii, rc) in enumerate(self.retina_checker):
+                    outputs = rc.model(images)
+                    output_buffer[counter:counter + num_images, :, ii] = outputs.cpu().numpy()
+                    all_pred[:, :, ii] = torch.nn.Sigmoid()(outputs).round().cpu().numpy()
+
+                predicted = self.mixture_function(all_pred)
+                result[counter:counter + num_images, :] = predicted
+                counter += num_images
+
+        self.last_dataset = dataset
+        self.last_loader = test_loader
+        if isinstance(output_return, list):
+            output_return.append(output_buffer)
+        return result

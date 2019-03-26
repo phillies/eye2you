@@ -44,14 +44,15 @@ def retina_checker(example_config):
     # Reading configuration file
     config = configparser.ConfigParser()
     config.read_string(example_config)
-    config['network']['pretrained'] = 'True'
 
     # create the checker class and initialize internal variables
     rc = RetinaChecker()
     rc.initialize(config)
     rc.train_file = LOCAL_DIR / rc.train_file
     rc.train_root = LOCAL_DIR / rc.train_root
-    rc.load_datasets(0.5)
+    rc.test_file = rc.train_file
+    rc.test_root = rc.train_root
+    rc.load_datasets()
     rc.create_dataloader()
 
     # Initialize the model
@@ -61,7 +62,7 @@ def retina_checker(example_config):
     return rc
 
 
-@pytest.fixture
+@pytest.fixture(scope='module')
 def retina_checker_s(example_config):
     # Reading configuration file
     config = configparser.ConfigParser()
@@ -85,12 +86,13 @@ def retina_checker_s(example_config):
     return rc
 
 
-@pytest.fixture
+@pytest.fixture(scope='module')
 def retina_checker_xs(example_config):
     # Reading configuration file
     config = configparser.ConfigParser()
     config.read_string(example_config)
     config['network']['model'] = 'inception_v3_xs'
+    config['network']['pretrained'] = 'True'
 
     # create the checker class and initialize internal variables
     rc = RetinaChecker()
@@ -110,21 +112,21 @@ def retina_checker_xs(example_config):
 
 
 @pytest.fixture(scope='module')
-def checkpoint_file(tmp_path_factory, retina_checker):
+def checkpoint_file(tmp_path_factory, retina_checker_s):
     model_path = tmp_path_factory.mktemp('ckpt')
     filename = model_path / 'tmpmodel.ckpt'
-    retina_checker.save_state(filename)
+    retina_checker_s.save_state(filename)
     return filename
 
 
 @pytest.fixture(scope='module')
-def multi_checkpoint_file(tmp_path_factory, retina_checker):
+def multi_checkpoint_file(tmp_path_factory, retina_checker_s):
     model_path = tmp_path_factory.mktemp('ckpt')
     filename = model_path / 'me_model.ckpt'
     models = []
-    config = retina_checker.config_string
-    classes = retina_checker.classes
-    state_dict = retina_checker.model.state_dict()
+    config = retina_checker_s.config_string
+    classes = retina_checker_s.classes
+    state_dict = retina_checker_s.model.state_dict()
     models.append(state_dict)
     models.append(state_dict)
     torch.save({'models': models, 'config': config, 'classes': classes}, filename)

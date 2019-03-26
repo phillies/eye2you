@@ -77,9 +77,8 @@ def test_inception_v3_s():
     assert not inc is None
     inc = None
 
-    with pytest.warns(Warning):
-        inc = models.inception_v3_s(pretrained=True)
-        assert not inc is None
+    inc = models.inception_v3_s(pretrained=True)
+    assert not inc is None
 
 
 def test_inception_v3_xs():
@@ -87,9 +86,8 @@ def test_inception_v3_xs():
     assert not inc is None
     inc = None
 
-    with pytest.warns(Warning):
-        inc = models.inception_v3_xs(pretrained=True)
-        assert not inc is None
+    inc = models.inception_v3_xs(pretrained=True)
+    assert not inc is None
 
 
 def test_resnet():

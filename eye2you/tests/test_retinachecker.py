@@ -168,16 +168,22 @@ def test_train_and_validation():
     assert confusion is not None
 
 
-def test_printing(retina_checker, retina_checker_s, retina_checker_xs):
+def test_printing(retina_checker):
     # Pretrained
     # with dataset and workers
     #assert False #TODO: implement me
     print(retina_checker)
     retina_checker.train()
     retina_checker.validate()
+
+
+def test_printing_s(retina_checker_s):
     print(retina_checker_s)
     retina_checker_s.train()
     retina_checker_s.validate()
+
+
+def test_printing_xs(retina_checker_xs):
     print(retina_checker_xs)
     retina_checker_xs.train()
     retina_checker_xs.validate()

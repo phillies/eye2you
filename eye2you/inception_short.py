@@ -7,21 +7,35 @@ import warnings
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision.models.inception import (BasicConv2d, InceptionA, InceptionB, InceptionC)
+from torch.utils import model_zoo
+from torchvision.models.inception import BasicConv2d, InceptionA, InceptionB, InceptionC
 
 __all__ = ['Inception3S', 'Inception3XS', 'inception_v3_s', 'inception_v3_xs']
+
+model_urls = {
+    'inception_v3_s': 'https://eye2you.org/models/inception_v3_s_eye2you-2bea754f.pth',
+    'inception_v3_xs': 'https://eye2you.org/models/inception_v3_xs_eye2you-3a70c6bb.pth'
+}
 
 
 def inception_v3_s(pretrained=False, **kwargs):
     if pretrained:
-        warnings.warn('No pretraining available. Using random.')
+        if 'transform_input' not in kwargs:
+            kwargs['transform_input'] = True
+        model = Inception3S(**kwargs)
+        model.load_state_dict(model_zoo.load_url(model_urls['inception_v3_s']))
+        return model
 
     return Inception3S(**kwargs)
 
 
 def inception_v3_xs(pretrained=False, **kwargs):
     if pretrained:
-        warnings.warn('No pretraining available. Using random.')
+        if 'transform_input' not in kwargs:
+            kwargs['transform_input'] = True
+        model = Inception3XS(**kwargs)
+        model.load_state_dict(model_zoo.load_url(model_urls['inception_v3_xs']))
+        return model
 
     return Inception3XS(**kwargs)
 

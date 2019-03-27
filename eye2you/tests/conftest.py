@@ -18,10 +18,13 @@ def example_config():
     model = inception_v3
 
     [hyperparameter]
+    batch size = 8
 
     [files]
     train file = ./data.csv
     train root = ./data/
+    samples = 128
+    num workers = 2
 
     [transform]
     [output]

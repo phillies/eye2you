@@ -40,6 +40,9 @@ def test_create_checker(tmp_path, example_config):
 
     assert os.path.isfile(tmp_path / 'tmpmodel.ckpt')
 
+    del rc
+    torch.cuda.empty_cache()
+
 
 def test_create_checker_s(tmp_path, example_config):
     # Reading configuration file
@@ -66,6 +69,9 @@ def test_create_checker_s(tmp_path, example_config):
     assert not rc.criterion is None
     assert not rc.optimizer is None
 
+    del rc
+    torch.cuda.empty_cache()
+
 
 def test_create_checker_xs(tmp_path, example_config):
     # Reading configuration file
@@ -91,6 +97,9 @@ def test_create_checker_xs(tmp_path, example_config):
     assert not rc.model is None
     assert not rc.criterion is None
     assert not rc.optimizer is None
+
+    del rc
+    torch.cuda.empty_cache()
 
 
 def test_loading_data():
@@ -167,6 +176,9 @@ def test_train_and_validation():
     assert accuracy is not None
     assert confusion is not None
 
+    del rc
+    torch.cuda.empty_cache()
+
 
 def test_printing(retina_checker):
     # Pretrained
@@ -218,6 +230,8 @@ def test_parse_config(checkpoint_file):
     rc.split_indices = ([1, 2, 3], [4, 5, 6])
 
     rc.save_state(checkpoint_file)
+    del rc
+    torch.cuda.empty_cache()
 
 
 def test_warning_unknown_names():
@@ -235,3 +249,31 @@ def test_warning_unknown_names():
         rc.initialize_criterion()
     with pytest.warns(Warning):
         rc.initialize_optimizer()
+    del rc
+    torch.cuda.empty_cache()
+
+
+def test_device_initialization(example_config):
+    # Reading configuration file
+    config = configparser.ConfigParser()
+    config.read_string(example_config)
+    config['network']['model'] = 'inception_v3_xs'
+    config['network'].pop('device', None)
+
+    # create the checker class and initialize internal variables
+    rc = RetinaChecker()
+    rc.initialize(config)
+
+    assert not rc.device == 'test'
+
+    del rc
+    torch.cuda.empty_cache()
+
+    config['network']['device'] = 'test'
+    rc = RetinaChecker()
+    rc.initialize(config)
+
+    assert rc.device == 'test'
+
+    del rc
+    torch.cuda.empty_cache()

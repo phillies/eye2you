@@ -195,6 +195,8 @@ class RetinaChecker():
 
         self.image_size = self.config['files'].getint('image size', 299)
 
+        if 'device' in self.config['network']:
+            self.device = self.config['network'].get('device', None)
         if self.device is None:
             self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         print('Using device', self.device)
@@ -518,7 +520,7 @@ class RetinaChecker():
         if self.train_loader is None:
             print('No training loader defined. Check configuration.')
             return
-        
+
         if evaluate_performance is None:
             evaluate_performance = self.evaluate_performance
 

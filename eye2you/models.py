@@ -3,6 +3,7 @@ from torchvision.models import (alexnet, densenet121, densenet161, densenet169, 
                                 vgg13, vgg13_bn, vgg16, vgg16_bn, vgg19, vgg19_bn)
 
 from .inception_short import inception_v3_s, inception_v3_xs
+from .unet import u_net
 
 __models__ = [
     alexnet, densenet121, densenet161, densenet169, densenet201, inception_v3, resnet18, resnet34, resnet50, resnet101,

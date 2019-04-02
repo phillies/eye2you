@@ -262,3 +262,65 @@ class PandasDataset(torch.utils.data.Dataset):
             transform=self.transform,
             target_transform=self.target_transform)
         return dataset
+
+
+class SegmentationDataset(torch.utils.data.Dataset):
+
+    def __init__(self):
+        super().__init__()
+        self.samples = None
+        self.samples_data = None
+        self.targets = None
+        self.targets_data = None
+        self.masks = None
+        self.masks_data = None
+        self.transform = lambda x: x
+        self.target_transform = lambda x: x
+        self.loaded = False
+
+    def __getitem__(self, index):
+        if index >= self.__len__():
+            raise ValueError('Index {} out of bounds for dataset with length {}'.format(index, self.__len__()))
+        sample = self.transform(self.samples_data[index])
+        target = self.target_transform(self.targets_data[index])
+        return sample, target
+
+    def __len__(self):
+        return len(self.samples)
+
+    def from_lists(self, samples, targets, masks=None):
+        if len(samples) != len(targets):
+            raise ValueError('Samples and targets must have same length.')
+        if masks is not None and len(masks) != len(targets):
+            raise ValueError('Masks and targets must have same length.')
+        self.samples = samples
+        self.samples_data = [None] * len(samples)
+        self.targets = targets
+        self.targets_data = [None] * len(targets)
+        self.masks = masks
+        if masks is not None:
+            self.masks_data = [None] * len(masks)
+        return self
+
+    def from_DataFrame(self, data):
+        if 'samples' not in data and 'targets' not in data:
+            raise ValueError('Samples and targets columns must be in DataFrame.')
+        self.samples = data['samples']
+        self.samples_data = [None] * len(self.samples)
+        self.targets = data['targets']
+        self.targets_data = [None] * len(self.targets)
+        if 'masks' in data:
+            self.masks = data['masks']
+            self.masks_data = [None] * len(self.masks)
+        return self
+
+    def preload(self):
+        for (ii, sample) in enumerate(self.samples):
+            self.samples_data[ii] = Image.open(sample)
+        for (ii, target) in enumerate(self.targets):
+            self.targets_data[ii] = Image.open(target)
+        if self.masks is not None:
+            for (ii, mask) in enumerate(self.masks):
+                self.mask_data[ii] = Image.open(mask)
+        self.loaded = True
+        return self

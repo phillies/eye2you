@@ -40,3 +40,28 @@ def merge_tensor_image(patches):
 def merge_label_on_image(images, labels):
     out = torch.clamp(images + labels, 0, 1)
     return out
+
+
+def measure_iou(output, label):
+    out = (output > 0.5).detach().cpu().numpy()
+    lab = (label > 0.5).detach().cpu().numpy()
+    union = out | lab
+    intersect = out & lab
+    iou = intersect.sum() / union.sum()
+    return iou
+
+
+def sample_patches(images, labels, patch_size, number_patches):
+    n, c, h, w = images.size()
+    max_y = h - patch_size
+    max_x = w - patch_size
+    img_patch = torch.zeros((number_patches, c, patch_size, patch_size))
+    lab_patch = torch.zeros((number_patches, 2, patch_size, patch_size))
+    for ii in range(number_patches):
+        img_index = np.random.randint(n)
+        p_x = np.random.randint(max_x)
+        p_y = np.random.randint(max_y)
+        img_patch[ii, ...] = images[img_index, :, p_y:p_y + patch_size, p_x:p_x + patch_size]
+        lab_patch[ii, 0, ...] = 1 - labels[img_index, :, p_y:p_y + patch_size, p_x:p_x + patch_size]
+        lab_patch[ii, 1, ...] = labels[img_index, :, p_y:p_y + patch_size, p_x:p_x + patch_size]
+    return img_patch, lab_patch

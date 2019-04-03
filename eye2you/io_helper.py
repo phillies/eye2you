@@ -6,7 +6,7 @@ import torch
 
 # Functions partially copied from torchvision
 
-IMG_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif']
+IMG_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tiff']
 
 
 def pil_loader(path):
@@ -30,6 +30,15 @@ def make_dataset(directory, class_to_idx, extensions):
                     item = (path, class_to_idx[target])
                     images.append(item)
 
+    return images
+
+
+def get_images(directory, extensions):
+    images = sorted([
+        os.path.join(directory, d)
+        for d in os.listdir(directory)
+        if has_file_allowed_extension(os.path.join(directory, d))
+    ])
     return images
 
 

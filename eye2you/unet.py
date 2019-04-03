@@ -12,15 +12,30 @@ def u_net256(in_channels=3, out_channels=2, sigmoid=False):
     return Unet256(in_channels=in_channels, out_channels=out_channels, sigmoid=sigmoid)
 
 
-def u_net(in_channels=3, out_channels=2, depth=2, sigmoid=False):
-    return UnetRec(in_channels=in_channels, out_channels=out_channels, depth=depth, sigmoid=sigmoid, top_layer=True)
+def u_net(in_channels=3, out_channels=2, depth=2, bias=False, final_layer='sigmoid'):
+    return Unet(
+        in_channels=in_channels,
+        out_channels=out_channels,
+        depth=depth,
+        bias=bias,
+        final_layer=final_layer,
+        upconv_batch=False,
+        top_layer=True)
 
 
-class UnetRec(nn.Module):
+class Unet(nn.Module):
 
-    def __init__(self, in_channels=3, out_channels=2, depth=2, sigmoid=False, top_layer=True):
+    def __init__(self,
+                 in_channels=3,
+                 out_channels=2,
+                 depth=2,
+                 bias=False,
+                 final_layer='sigmoid',
+                 upconv_batch=False,
+                 top_layer=True):
         super().__init__()
 
+        self.top_layer = top_layer
         if top_layer:
             c_inner = 32
         else:
@@ -31,79 +46,47 @@ class UnetRec(nn.Module):
         if depth <= 1:
             self.inner = BasicBlock2d(in_channels=2 * c_inner, out_channels=4 * c_inner)
         else:
-            self.inner = UnetRec(in_channels=2 * c_inner, out_channels=4 * c_inner, depth=depth - 1, top_layer=False)
-        self.up = UpConv2d(in_channels=4 * c_inner, out_channels=2 * c_inner)
+            self.inner = Unet(in_channels=2 * c_inner, out_channels=4 * c_inner, depth=depth - 1, top_layer=False)
+        self.up = UpConv2d(in_channels=4 * c_inner, out_channels=2 * c_inner, batch_norm=upconv_batch)
         self.conv_out = BasicBlock2d(in_channels=4 * c_inner, out_channels=2 * c_inner)
 
         if top_layer:
             self.out = nn.Conv2d(
                 in_channels=2 * c_inner, out_channels=out_channels, kernel_size=1, padding=0, bias=False)
-            if sigmoid:
+            if final_layer == 'sigmoid':
                 self.final = nn.Sigmoid()
-            else:
+            elif final_layer == 'softmax':
                 self.final = nn.Softmax(dim=1)
+            else:
+                self.final = lambda x: x
 
     def forward(self, x):
-        print(x.size())
+        #print(x.size())
         x = self.conv_in(x)
-        print(x.size())
+        #print(x.size())
         x_res = x.clone()
-        print(x.size())
+        #print(x.size())
         x = self.down(x)
-        print(x.size())
+        #print(x.size())
         x = self.inner(x)
-        print(x.size())
+        #print(x.size())
         x = self.up(x)
-        print(x.size())
+        #print(x.size())
         x = torch.cat((x_res, x), dim=1)
-        print(x.size())
+        del x_res
+        #print(x.size())
         x = self.conv_out(x)
-        print(x.size())
-        return x
+        #print(x.size())
+        if self.top_layer:
+            x = self.out(x)
 
-
-class UnetFlex(nn.Module):
-
-    def __init__(self, in_channels=3, out_channels=2, depth=2, sigmoid=False):
-        super().__init__()
-
-        self.sequence = ['conv', 'copy', 'down'] * depth + ['conv'] + ['up', 'merge', 'conv'] * depth + ['out']
-
-        self.net = _assemble_unet(self.sequence, in_channels, out_channels)
-
-        if sigmoid:
-            self.final = nn.Sigmoid()
-        else:
-            self.final = nn.Softmax(dim=1)
-
-    def forward(self, x):
-        residual_stack = []
-
-        for ii, ops in enumerate(self.sequence[1:]):
-            if ops == 'conv_double':
-                x = ops(x)
-            elif ops == 'copy':
-                residual_stack.append(x.clone())
-            elif ops == 'down':
-                x = ops(x)
-            elif ops == 'up':
-                x = ops(x)
-            elif ops == 'merge':
-                x_res = residual_stack.pop()
-                x = torch.cat((x, x_res), dim=1)
-            elif ops == 'conv_half':
-                x = ops(x)
-            elif ops == 'out':
-                x = ops(x)
-            print(x.size())
-
-        x = self.final(x)
+            x = self.final(x)
         return x
 
 
 class Unet128(nn.Module):
 
-    def __init__(self, in_channels=3, out_channels=2, depth=2, sigmoid=False):
+    def __init__(self, in_channels=3, out_channels=2, sigmoid=False):
         super().__init__()
 
         self.block1 = BasicBlock2d(in_channels, 64)
@@ -143,7 +126,7 @@ class Unet128(nn.Module):
 
 class Unet256(nn.Module):
 
-    def __init__(self, in_channels=3, out_channels=2, depth=2, sigmoid=False):
+    def __init__(self, in_channels=3, out_channels=2, sigmoid=False):
         super().__init__()
 
         self.block1 = BasicBlock2d(in_channels, 64)

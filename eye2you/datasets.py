@@ -1,13 +1,18 @@
 import os
 import sys
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
+import sklearn.model_selection
 import torch
 import torch.utils.data
+import torchvision
+import torchvision.transforms.functional as F
 from PIL import Image
-import sklearn.model_selection
-from .io_helper import pil_loader, IMG_EXTENSIONS, find_classes, make_dataset
+
+from .io_helper import IMG_EXTENSIONS, find_classes, make_dataset, pil_loader
+from .image_helper import parallel_variance
 
 
 class PandasDataset(torch.utils.data.Dataset):
@@ -274,16 +279,55 @@ class SegmentationDataset(torch.utils.data.Dataset):
         self.targets_data = None
         self.masks = None
         self.masks_data = None
-        self.transform = lambda x: x
-        self.target_transform = lambda x: x
+        self.transform = torchvision.transforms.ToTensor()
+        self.target_transform = torchvision.transforms.ToTensor()
+        self.mean = None
+        self.std = None
         self.loaded = False
 
     def __getitem__(self, index):
         if index >= self.__len__():
             raise ValueError('Index {} out of bounds for dataset with length {}'.format(index, self.__len__()))
-        sample = self.transform(self.samples_data[index])
-        target = self.target_transform(self.targets_data[index])
+
+        if self.loaded:
+            sample = self.transform(self.samples_data[index])
+            target = self.target_transform(self.targets_data[index])
+        else:
+            sample = self.transform(Image.open(self.samples[index]))
+            target = self.target_transform(Image.open(self.targets[index]))
         return sample, target
+
+    def get_sample(self, index):
+        if index >= self.__len__():
+            raise ValueError('Index {} out of bounds for dataset with length {}'.format(index, self.__len__()))
+
+        if self.loaded:
+            sample = self.transform(self.samples_data[index])
+        else:
+            sample = self.transform(Image.open(self.samples[index]))
+        return sample
+
+    def get_target(self, index):
+        if index >= self.__len__():
+            raise ValueError('Index {} out of bounds for dataset with length {}'.format(index, self.__len__()))
+
+        if self.loaded:
+            target = self.target_transform(self.targets_data[index])
+        else:
+            target = self.target_transform(Image.open(self.targets[index]))
+        return target
+
+    def get_mask(self, index):
+        if index >= self.__len__():
+            raise ValueError('Index {} out of bounds for dataset with length {}'.format(index, self.__len__()))
+
+        if self.mask is None:
+            mask = torch.ones_like(self.get_sample(index))
+        elif self.loaded:
+            mask = self.target_transform(self.masks_data[index])
+        else:
+            mask = self.target_transform(Image.open(self.masks[index]))
+        return mask
 
     def __len__(self):
         return len(self.samples)
@@ -321,6 +365,88 @@ class SegmentationDataset(torch.utils.data.Dataset):
             self.targets_data[ii] = Image.open(target)
         if self.masks is not None:
             for (ii, mask) in enumerate(self.masks):
-                self.mask_data[ii] = Image.open(mask)
+                self.masks_data[ii] = Image.open(mask)
         self.loaded = True
+        self.mean_and_std()
+        return self
+
+    def mean_and_std(self):
+        if self.loaded:
+            x = torchvision.transforms.ToTensor()(self.samples_data[0])
+            if self.masks is not None:
+                mask = torchvision.transforms.ToTensor()(self.masks_data[0])
+                x = x[:, (mask == 1)[0, :, :]]
+            else:
+                x = x.reshape(x.shape[0], -1)
+            mean_x = x.mean(1)
+            var_x = x.var(1)
+            count_x = x.shape[1]
+            for ii in range(1, self.__len__()):
+                x_b = torchvision.transforms.ToTensor()(self.samples_data[ii])
+                if self.masks is not None:
+                    mask = torchvision.transforms.ToTensor()(self.masks_data[0])
+                    x_b = x_b[:, (mask == 1)[0, :, :]]
+                else:
+                    x_b = x_b.reshape(x_b.shape[0], -1)
+                mean_x_b = x_b.mean(1)
+                var_x_b = x_b.var(1)
+                count_x_b = x_b.shape[1]
+
+                var_x = parallel_variance(mean_x, count_x, var_x, mean_x_b, count_x_b, var_x_b)
+                mean_x = (mean_x * count_x + mean_x_b * count_x_b) / (count_x + count_x_b)
+                count_x += count_x_b
+        else:
+            raise NotImplementedError('Sorry, not yet implemented. Please preload dataset.')
+        self.mean = mean_x
+        self.std = np.sqrt(var_x)
+        return self.mean, self.std
+
+
+class SegmentationDatasetWithSampler(SegmentationDataset):
+    '''Segmentation dataset with built-in RandomResizedCrop transformation so that the
+    source images and the segmentation targets are sampled in the same manner.
+    '''
+
+    def __init__(self, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.), interpolation=Image.BILINEAR,
+                 normalize=False):
+        super().__init__()
+        self.update_transform(size=size, scale=scale, ratio=ratio, interpolation=interpolation, normalize=normalize)
+        self.normalize_transform = None
+
+    def update_transform(self,
+                         size,
+                         scale=(0.08, 1.0),
+                         ratio=(3. / 4., 4. / 3.),
+                         interpolation=Image.BILINEAR,
+                         normalize=False):
+        self.random_resized_crop = torchvision.transforms.RandomResizedCrop(
+            size=size, scale=scale, ratio=ratio, interpolation=interpolation)
+        self.normalize = normalize
+
+    def __getitem__(self, index):
+        if index >= self.__len__():
+            raise ValueError('Index {} out of bounds for dataset with length {}'.format(index, self.__len__()))
+
+        if self.loaded:
+            sample = self.samples_data[index]
+            target = self.targets_data[index]
+        else:
+            sample = Image.open(self.samples[index])
+            target = Image.open(self.targets[index])
+
+        i, j, h, w = self.random_resized_crop.get_params(sample, self.random_resized_crop.scale,
+                                                         self.random_resized_crop.ratio)
+        sample = F.resized_crop(sample, i, j, h, w, self.random_resized_crop.size,
+                                self.random_resized_crop.interpolation)
+        target = F.resized_crop(target, i, j, h, w, self.random_resized_crop.size, Image.NEAREST)
+        sample = self.transform(sample)
+        target = self.target_transform(target)
+        if self.normalize:
+            sample = self.normalize_transform(sample)
+        return sample, target
+
+    def preload(self):
+        super().preload()
+        if self.normalize:
+            self.normalize_transform = torchvision.transforms.Normalize(self.mean, self.std)
         return self

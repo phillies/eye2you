@@ -43,12 +43,15 @@ def merge_label_on_image(images, labels):
 
 
 def measure_iou(output, label):
-    out = (output > 0.5).detach().cpu().numpy()
-    lab = (label > 0.5).detach().cpu().numpy()
-    union = out | lab
-    intersect = out & lab
-    iou = intersect.sum() / union.sum()
-    return iou
+    ious = []
+    for ii in range(output.shape[0]):
+        out = (output[ii, ...] > 0.5).detach().cpu().numpy()
+        lab = (label[ii, ...] > 0.5).detach().cpu().numpy()
+        union = out | lab
+        intersect = out & lab
+        iou = intersect.sum() / union.sum()
+        ious.append(iou)
+    return ious
 
 
 def sample_patches(images, labels, patch_size, number_patches):
@@ -65,3 +68,11 @@ def sample_patches(images, labels, patch_size, number_patches):
         lab_patch[ii, 0, ...] = 1 - labels[img_index, :, p_y:p_y + patch_size, p_x:p_x + patch_size]
         lab_patch[ii, 1, ...] = labels[img_index, :, p_y:p_y + patch_size, p_x:p_x + patch_size]
     return img_patch, lab_patch
+
+
+def parallel_variance(mean_a, count_a, var_a, mean_b, count_b, var_b):
+    delta = mean_b - mean_a
+    m_a = var_a * (count_a - 1)
+    m_b = var_b * (count_b - 1)
+    M2 = m_a + m_b + delta**2 * count_a * count_b / (count_a + count_b)
+    return M2 / (count_a + count_b - 1)

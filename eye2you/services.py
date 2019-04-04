@@ -253,6 +253,10 @@ class Service():
 
         return contours
 
+    def get_vessels(self, img):
+        #apply padding so that it is divisible by 2 if size < 512, else use sliding windows of 256?!?
+        pass
+
     def __str__(self):
         desc = 'medAI Service:\n'
         desc += 'Loaded from {}\n'.format(self.checkpoint)

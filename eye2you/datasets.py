@@ -284,6 +284,7 @@ class SegmentationDataset(torch.utils.data.Dataset):
         self.mean = None
         self.std = None
         self.loaded = False
+        self.normalize = False
 
     def __getitem__(self, index):
         if index >= self.__len__():
@@ -295,6 +296,11 @@ class SegmentationDataset(torch.utils.data.Dataset):
         else:
             sample = self.transform(Image.open(self.samples[index]))
             target = self.target_transform(Image.open(self.targets[index]))
+        return sample, target
+
+    def get_item(self, index):
+        sample = self.get_sample(index)
+        target = self.get_target(index)
         return sample, target
 
     def get_sample(self, index):
@@ -397,9 +403,35 @@ class SegmentationDataset(torch.utils.data.Dataset):
                 count_x += count_x_b
         else:
             raise NotImplementedError('Sorry, not yet implemented. Please preload dataset.')
-        self.mean = mean_x
-        self.std = np.sqrt(var_x)
+        self.mean = mean_x.numpy()
+        self.std = np.sqrt(var_x).numpy()
         return self.mean, self.std
+
+    @property
+    def trans(self):
+        if self.normalize:
+            return torchvision.transforms.Compose([self.transform, self.normalize_transform])
+        else:
+            return self.transform
+
+    @trans.setter
+    def trans(self, transform):
+        self.transform = transform
+
+    def normalize_as(self, dataset):
+        self.normalize = True
+        self.mean = dataset.mean
+        self.std = dataset.std
+        self.normalize_transform = torchvision.transforms.Normalize(mean=self.mean, std=self.std)
+
+    def __repr__(self):
+        fmt_str = 'Dataset ' + self.__class__.__name__ + '\n'
+        fmt_str += '    Number of datapoints: {}\n'.format(self.__len__())
+        tmp = '    Transforms (if any): '
+        fmt_str += '{0}{1}\n'.format(tmp, self.transform.__repr__().replace('\n', '\n' + ' ' * len(tmp)))
+        tmp = '    Target Transforms (if any): '
+        fmt_str += '{0}{1}'.format(tmp, self.target_transform.__repr__().replace('\n', '\n' + ' ' * len(tmp)))
+        return fmt_str
 
 
 class SegmentationDatasetWithSampler(SegmentationDataset):
@@ -450,3 +482,12 @@ class SegmentationDatasetWithSampler(SegmentationDataset):
         if self.normalize:
             self.normalize_transform = torchvision.transforms.Normalize(self.mean, self.std)
         return self
+
+    def __repr__(self):
+        fmt_str = 'Dataset ' + self.__class__.__name__ + '\n'
+        fmt_str += '    Number of datapoints: {}\n'.format(self.__len__())
+        tmp = '    Transforms (if any): '
+        fmt_str += '{0}{1}\n'.format(tmp, self.transform.__repr__().replace('\n', '\n' + ' ' * len(tmp)))
+        tmp = '    Target Transforms (if any): '
+        fmt_str += '{0}{1}'.format(tmp, self.target_transform.__repr__().replace('\n', '\n' + ' ' * len(tmp)))
+        return fmt_str

@@ -14,7 +14,7 @@ class SlidingWindowCrop():
         w, h = pic.size
         p_h, p_w = self.size
         n_h = int((h - p_h) / self.stride)
-        n_w = int((h - p_h) / self.stride)
+        n_w = int((w - p_w) / self.stride)
         patches = []
         for ii in range(n_h):
             for jj in range(n_w):

@@ -11,7 +11,7 @@ from PIL import Image
 from .checker import RetinaChecker
 from .datasets import PandasDataset
 from .io_helper import merge_models_from_checkpoints
-from .image_helper import cv2_to_PIL, PIL_to_cv2, torch_to_cv2, float_to_uint8
+from .image_helper import cv2_to_PIL, PIL_to_cv2, torch_to_cv2, float_to_uint8, find_retina_boxes
 from .models import u_net
 
 FEATURE_BLOBS = []
@@ -244,7 +244,7 @@ class Service():
         # opencv changed return value from (image, contours, hierarchy) in 3.4 to (contours, hierarchy) in 4.0
         if len(contours_return) == 3:
             _, contours, _ = contours_return
-        if len(contours_return) == 2:
+        elif len(contours_return) == 2:
             contours, _ = contours_return
         else:
             message = '''cv2.findCountours() returned {} values. This version can only deal with 2 or 3 return values (tested on cv2 3.4 and 4.0).
@@ -401,16 +401,15 @@ class MultiService(Service):
         super().__init__(checkpoint=None, device=device)
         self.checkpoint = checkpoint
         self.unet = u_net(in_channels=3, out_channels=2, depth=unet_depth)
+        self.unet_depth = unet_depth
         self.unet_state = unet_state
         if checkpoint is not None and unet_state is not None:
             self.initialize()
 
     def initialize(self):
-        super().initialize()
-        if self.checkpoint is None:
-            raise ValueError('checkpoint cannot be None')
         if self.unet_state is None:
             raise ValueError('unet_state cannot be None')
+        super().initialize()
 
         self.unet.load_state_dict(torch.load(self.unet_state), strict=False)
 
@@ -423,7 +422,16 @@ class MultiService(Service):
         else:
             raise ValueError('Only PIL Image or numpy array supported')
 
-        x_img = self.transform(image)
+        print('DEMO MODE: Rescaling image to 320x320 before vessel detection')
+        transform = torchvision.transforms.Compose([
+            torchvision.transforms.Resize(int(320)),
+            torchvision.transforms.CenterCrop(320),
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Normalize(self.retina_checker.normalize_mean, self.retina_checker.normalize_std)
+        ])
+        x_img = transform(image)
+
+        #x_img = self.transform(image)
         x_device = x_img.to(self.device).unsqueeze(0)
 
         y_device = self.unet(x_device)
@@ -439,7 +447,7 @@ class MultiService(Service):
         if merge_image:
             img_cv = PIL_to_cv2(img).astype(float)
             ves_cv = PIL_to_cv2(vessel).astype(float)
-            out = np.clip(img_cv + ves_cv, 0, 255)
+            out = np.clip(img_cv + ves_cv[:, :, None], 0, 255)
             vessel = cv2_to_PIL(out)
         return vessel
 

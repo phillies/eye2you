@@ -27,7 +27,8 @@ setup(name='eye2you',
         'torch',
         'torchvision',
         'opencv-python',
-        'sklearn'
+        'sklearn',
+        'tqdm'
     ],
     include_package_data=True,
     zip_safe=False,

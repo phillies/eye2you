@@ -41,18 +41,24 @@ class Unet(nn.Module):
         else:
             c_inner = in_channels
 
-        self.conv_in = BasicBlock2d(in_channels=in_channels, out_channels=2 * c_inner)
+        self.conv_in = BasicBlock2d(in_channels=in_channels, out_channels=2 * c_inner, bias=bias)
         self.down = nn.MaxPool2d(kernel_size=2)
         if depth <= 1:
-            self.inner = BasicBlock2d(in_channels=2 * c_inner, out_channels=4 * c_inner)
+            self.inner = BasicBlock2d(in_channels=2 * c_inner, out_channels=4 * c_inner, bias=bias)
         else:
-            self.inner = Unet(in_channels=2 * c_inner, out_channels=4 * c_inner, depth=depth - 1, top_layer=False)
-        self.up = UpConv2d(in_channels=4 * c_inner, out_channels=2 * c_inner, batch_norm=upconv_batch)
-        self.conv_out = BasicBlock2d(in_channels=4 * c_inner, out_channels=2 * c_inner)
+            self.inner = Unet(
+                in_channels=2 * c_inner,
+                out_channels=4 * c_inner,
+                depth=depth - 1,
+                top_layer=False,
+                bias=bias,
+                upconv_batch=upconv_batch)
+        self.up = UpConv2d(in_channels=4 * c_inner, out_channels=2 * c_inner, batch_norm=upconv_batch, bias=bias)
+        self.conv_out = BasicBlock2d(in_channels=4 * c_inner, out_channels=2 * c_inner, bias=bias)
 
         if top_layer:
             self.out = nn.Conv2d(
-                in_channels=2 * c_inner, out_channels=out_channels, kernel_size=1, padding=0, bias=False)
+                in_channels=2 * c_inner, out_channels=out_channels, kernel_size=1, padding=0, bias=bias)
             if final_layer == 'sigmoid':
                 self.final = nn.Sigmoid()
             elif final_layer == 'softmax':

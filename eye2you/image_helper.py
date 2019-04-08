@@ -3,16 +3,122 @@ import torch
 import torchvision
 import cv2
 from .transforms import SlidingWindowCrop
+import tqdm
+from PIL import Image
+
+
+def float_to_uint8(img, min_val=None, max_val=None):
+    if min_val is None:
+        min_val = img.min()
+    if max_val is None:
+        max_val = img.max()
+    img_scale = img - min_val
+    img_scale = img_scale / (max_val - min_val)
+    img_scale = (img_scale * 255).astype(np.ubyte)
+    return img_scale
+
+
+def PIL_to_cv2(img):
+    '''Converts PIL uint8 image into numpy array. No conversion applied.
+
+    Arguments:
+        img {PIL.Image} -- PIL image object
+
+    Returns:
+        numpy.array -- numpy array with same data as PIL image
+    '''
+
+    return np.array(img)
+
+
+def PIL_to_torch(img):
+    '''Converts PIL uint8 image into torch tensor. No conversion applied.
+
+    Arguments:
+        img {PIL.Image} -- PIL image object
+
+    Returns:
+        torch.Tensor -- torch tensor with same data as PIL image
+    '''
+
+    return torchvision.transforms.ToTensor()(img)
+
+
+def torch_to_PIL(img):
+    '''Converts torch tensor image into PIL uint8. No conversion applied.
+
+    Arguments:
+        img {torch.tensor} -- torch tensor
+
+    Returns:
+        PIL.Image -- PIL Image with same data as torch tensor
+    '''
+
+    return torchvision.transforms.ToPILImage()(img)
+
+
+def torch_to_cv2(img):
+    '''Converts torch format (NCHW) to cv2 format (HWC)
+
+    Arguments:
+        img {torch.Tensor} -- NCHW shaped with n=1 or CHW shaped torch tensor
+
+    Returns:
+        [numpy.ndarray] -- PIL image in uint8 format
+    '''
+    img = np.transpose(img.squeeze().numpy(), axes=(1, 2, 0))
+    return img
+
+
+def cv2_to_PIL(img, min_val=None, max_val=None):
+    '''Converts the cv2 image or numpy array of arbitrary scale to a PIL image with
+    uint8 format. Upper and lower bound for scaling can be given, e.g. 0.0 and 1.0, otherwise
+    min and max values of image are used for 0 and 255. No clipping is applied. Passing a lower
+    bound larger than the smallest value in the image can lead to values <0 and undefined behaviour
+    in the conversion.
+
+    Arguments:
+        img {numpy.array} -- Numpy array compatible to PIL, e.g. h,w,1 or h,w,3 shaped
+
+    Keyword Arguments:
+        min_val {float} -- lower bound for scaling (default: {None})
+        max_val {float} -- upper bound for scaling (default: {None})
+
+    Returns:
+        [PIL.Image] -- PIL image in uint8 format
+    '''
+
+    img_scale = float_to_uint8(img, min_val, max_val)
+    pil_img = Image.fromarray(img_scale)
+    return pil_img
+
+
+def cv2_to_torch(img):
+    '''Converts cv2 format (HWC) to torch format (NCHW)
+
+    Arguments:
+        img {numpy.array} -- Numpy array compatible to PIL, e.g. h,w,1 or h,w,3 shaped
+
+    Keyword Arguments:
+        min_val {float} -- lower bound for scaling (default: {None})
+        max_val {float} -- upper bound for scaling (default: {None})
+
+    Returns:
+        [PIL.Image] -- PIL image in uint8 format
+    '''
+    img = np.transpose(img, axes=(1, 2, 0))
+    torch_img = torch.Tensor(img).unsqueeze(0)
+    return pil_img
 
 
 def split_tensor_image(img, patch_size):
     '''Split a tensor into patches of (patch_size x patch_size).
-    Pixels on the right get lost when patch_size does not match 
-    
+    Pixels on the right get lost when patch_size does not match
+
     Arguments:
         img {torch.Tensor} -- Tensor in CHW format
         patch_size {int} -- Edge length of the target patches
-    
+
     Returns:
         torch.Tensor -- NCHW shaped tensor with all patches
     '''
@@ -259,3 +365,155 @@ def denoise(img, ksize=(5, 5), morph=cv2.MORPH_RECT):
     kernel = cv2.getStructuringElement(morph, ksize)
     img = cv2.morphologyEx(img, cv2.MORPH_OPEN, kernel)
     return img
+
+
+def find_retina_boxes(im,
+                      display=False,
+                      dp=1.0,
+                      param1=60,
+                      param2=50,
+                      minimum_circle_distance=0.2,
+                      minimum_radius=0.4,
+                      maximum_radius=0.65,
+                      max_patch_size=800,
+                      max_distance_center=0.05,
+                      param1_limit=40,
+                      param1_step=10,
+                      param2_limit=20,
+                      param2_step=10):
+    '''Finds the inner and outer box around the retina using openCV
+    HoughCircles. If more than one circle is found returns the circle with the center
+    closest to the image center.
+    Recursively decreases first param1 then param2 if no circles are found until the limit for both parameter is reached.
+    Be cautious, setting the parameter limits too low will lead to very high computation time.
+    For details see OpenCV documentation [https://docs.opencv.org/master/dd/d1a/group__imgproc__feature.html#ga47849c3be0d0406ad3ca45db65a25d2d]
+
+    Arguments:
+        im {numpy.array} -- HWC-shaped uint8 numpy array containing the image data
+
+    Keyword Arguments:
+        display {bool} -- If true returns image with all circles drawn on it as 5th entry in tuple  (default: {False})
+        dp {float} -- Inverse ratio of the accumulator resolution to the image resolution. For example, if dp=1, the accumulator has the same resolution as the input image. If dp=2 , the accumulator has half as big width and height. (default: {1.0})
+        param1 {int} -- the higher threshold of the two passed to the Canny edge detector (the lower one is twice smaller). (default: {60})
+        param2 {int} -- the accumulator threshold for the circle centers at the detection stage. The smaller it is, the more false circles may be detected. Circles, corresponding to the larger accumulator values, will be returned first. (default: {50})
+        minimum_circle_distance {float} -- Minimum distance between the centers of the detected circles. If the parameter is too small, multiple neighbor circles may be falsely detected in addition to a true one. If it is too large, some circles may be missed. (default: {0.2})
+        minimum_radius {float} -- Minimum radius of the detected circle given in patch size (default: {0.4})
+        maximum_radius {float} -- Maximum radius of the detected citcle given in patch size (default: {0.65})
+        max_patch_size {int} -- Scales down the image to this size if it is larger to speed up computation (default: {800})
+        max_distance_center {float} -- Maximum distance to the center of the patch given in patch size (default: {0.05})
+        param1_limit {int} -- lower bound on param1 during the recursive search if no circle is found (default: {40})
+        param1_step {int} -- step size for decreasing param1 in recursive search (default: {10})
+        param2_limit {int} -- lower bound on param2 during the recursive search if no circle is found (default: {20})
+        param2_step {int} -- step size for decreasing param2 in recursive search (default: {10})
+
+    Returns:
+        tuple -- (x, y, r_in, r_out, img) where x,y coordinates of the box center, radius d of the inner box and radius r of the outer box, img image with circles, None if no circle is found
+    '''
+
+    gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+    scale_factor = max(gray.shape) / max_patch_size
+    shape = (int(gray.shape[0] / scale_factor), int(gray.shape[1] / scale_factor))
+    gray = cv2.resize(gray.T, shape).T
+    output = None
+
+    minRadius = int(min(gray.shape) * minimum_radius)
+    maxRadius = int(min(gray.shape) * maximum_radius)
+    minDist = int(min(gray.shape) * minimum_circle_distance)
+    maxDist = int(min(gray.shape) * max_distance_center)
+
+    # detect circles in the image
+    try:
+        circles = cv2.HoughCircles(
+            gray,
+            cv2.HOUGH_GRADIENT,
+            dp=dp,
+            minDist=minDist,
+            param1=param1,
+            param2=param2,
+            minRadius=minRadius,
+            maxRadius=maxRadius)
+    except Exception as e:
+        print('Something bad happened:', e)
+        return None
+    # ensure at least some circles were found
+
+    if circles is not None:
+        # convert the (x, y) coordinates and radius of the circles to integers
+        circles = np.round(circles[0, :]).astype("int")
+
+        center_circle = 0
+        if len(circles) > 1:
+            cy, cx = np.array(gray.shape) / 2
+            dist = np.sqrt((circles[:, 0] - cx)**2 + (circles[:, 1] - cy)**2)
+            center_circle = np.argmin(dist)
+            if dist[center_circle] > maxDist:
+                center_circle = None
+                #print(dist[center_circle], maxDist)
+
+        if display:
+            # loop over the (x, y) coordinates and radius of the circles
+            output = im.copy()
+            circles = np.round(scale_factor * circles).astype(int)
+            for (x, y, r) in circles:
+                # draw the circle in the output image, then draw a rectangle
+                # corresponding to the center of the circle
+                cv2.circle(output, (x, y), r, (0, 255, 0), 4)
+                cv2.rectangle(output, (x - 5, y - 5), (x + 5, y + 5), (0, 128, 255), -1)
+            if center_circle is not None:
+                x, y, r = circles[center_circle, :]
+                cv2.circle(output, (x, y), r, (0, 255, 255), 4)
+                cv2.rectangle(output, (x - 5, y - 5), (x + 5, y + 5), (128, 128, 255), -1)
+
+        if center_circle is not None:
+            x, y, r_out = np.round(scale_factor * circles[center_circle, :]).astype(int)
+            r_in = int(np.sqrt((r_out**2) / 2))
+            return x, y, r_in, r_out, output
+        else:
+            return None
+
+    if circles is None or center_circle is None:
+        #warnings.warn('No circles found on image')
+        if param1 > param1_limit:
+            param1 -= abs(param1_step)
+            print('Retry with param1=', param1)
+            return find_retina_boxes(
+                im,
+                display,
+                dp=dp,
+                param1=param1,
+                param2=param2,
+                minimum_circle_distance=minimum_circle_distance,
+                minimum_radius=minimum_radius,
+                maximum_radius=maximum_radius,
+                max_patch_size=max_patch_size,
+                max_distance_center=max_distance_center)
+        elif param2 > param2_limit:
+            param2 -= abs(param2_step)
+            print('Retry with param2=', param2)
+            return find_retina_boxes(
+                im,
+                display,
+                dp=dp,
+                param1=param1,
+                param2=param2,
+                minimum_circle_distance=minimum_circle_distance,
+                minimum_radius=minimum_radius,
+                maximum_radius=maximum_radius,
+                max_patch_size=max_patch_size,
+                max_distance_center=max_distance_center)
+        else:
+            print('no luck, skipping image')
+
+    return None
+
+
+def get_retina_mask(img):
+    mask = np.zeros((img.shape[:2]), dtype=np.uint8)
+    circle = find_retina_boxes(img)
+    if circle is None:
+        return mask
+    x, y, r_in, r_out, output = circle
+
+    cv2.circle(mask, (x, y), r_out, (255), cv2.FILLED)
+
+    return mask

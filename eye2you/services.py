@@ -10,7 +10,9 @@ from PIL import Image
 
 from .checker import RetinaChecker
 from .datasets import PandasDataset
-from .io_helper import cv2_to_PIL, PIL_to_cv2, merge_models_from_checkpoints
+from .io_helper import merge_models_from_checkpoints
+from .image_helper import cv2_to_PIL, PIL_to_cv2, torch_to_cv2, float_to_uint8
+from .models import u_net
 
 FEATURE_BLOBS = []
 
@@ -173,10 +175,10 @@ class Service():
 
     def get_largest_prediction(self, image):
         '''Returns the class index of the largest prediction
-        
+
         Arguments:
             image {PIL.Image.Image} -- PIL image to analyze
-        
+
         Returns:
             int -- class index of the largest prediction
         '''
@@ -252,10 +254,6 @@ class Service():
             raise RuntimeError(message)
 
         return contours
-
-    def get_vessels(self, img):
-        #apply padding so that it is divisible by 2 if size < 512, else use sliding windows of 256?!?
-        pass
 
     def __str__(self):
         desc = 'medAI Service:\n'
@@ -348,10 +346,10 @@ class MEService(Service):
 
     def get_largest_prediction(self, image):
         '''Returns the class index of the largest prediction
-        
+
         Arguments:
             image {PIL.Image.Image} -- PIL image to analyze
-        
+
         Returns:
             int -- class index of the largest prediction
         '''
@@ -395,3 +393,74 @@ class MEService(Service):
         if isinstance(output_return, list):
             output_return.append(output_buffer)
         return result
+
+
+class MultiService(Service):
+
+    def __init__(self, checkpoint=None, device=None, unet_depth=2, unet_state=None):
+        super().__init__(checkpoint=None, device=device)
+        self.checkpoint = checkpoint
+        self.unet = u_net(in_channels=3, out_channels=2, depth=unet_depth)
+        self.unet_state = unet_state
+        if checkpoint is not None and unet_state is not None:
+            self.initialize()
+
+    def initialize(self):
+        super().initialize()
+        if self.checkpoint is None:
+            raise ValueError('checkpoint cannot be None')
+        if self.unet_state is None:
+            raise ValueError('unet_state cannot be None')
+
+        self.unet.load_state_dict(torch.load(self.unet_state), strict=False)
+
+    def get_vessels(self, img, merge_image=False):
+        #apply padding so that it is divisible by 2 if size < 512, else use sliding windows of 256?!?
+        if isinstance(img, np.ndarray):
+            image = cv2_to_PIL(img)
+        elif isinstance(img, Image.Image):
+            image = img
+        else:
+            raise ValueError('Only PIL Image or numpy array supported')
+
+        x_img = self.transform(image)
+        x_device = x_img.to(self.device).unsqueeze(0)
+
+        y_device = self.unet(x_device)
+        y_img = y_device.to('cpu')
+        del x_device, y_device
+        label = (y_img[:, 1, :, :] > y_img[:, 0, :, :]).float().squeeze()
+
+        mask = self.get_retina_mask(float_to_uint8(torch_to_cv2(x_img)))
+
+        vessel = cv2_to_PIL(label.numpy() * mask)
+        vessel = torchvision.transforms.Resize(image.size, interpolation=Image.NEAREST)(vessel)
+
+        if merge_image:
+            img_cv = PIL_to_cv2(img).astype(float)
+            ves_cv = PIL_to_cv2(vessel).astype(float)
+            out = np.clip(img_cv + ves_cv, 0, 255)
+            vessel = cv2_to_PIL(out)
+        return vessel
+
+    def get_retina_mask(self, img):
+        mask = np.zeros((img.shape[:2]), dtype=np.uint8)
+        circle = find_retina_boxes(
+            img,
+            display=False,
+            dp=2.0,
+            param1=60,
+            param2=50,
+            minimum_circle_distance=0.2,
+            minimum_radius=0.4,
+            maximum_radius=0.65,
+            max_patch_size=800,
+            max_distance_center=0.05,
+            param1_limit=40,
+            param1_step=10,
+            param2_limit=20,
+            param2_step=10)
+        x, y, r_in, r_out, output = circle
+
+        cv2.circle(mask, (x, y), r_out - 1, (255), cv2.FILLED)
+        return mask

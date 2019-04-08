@@ -42,7 +42,7 @@ def test_classify(default_service):
     max_pred = default_service.get_largest_prediction(img)
     assert prediction.argmax() == max_pred
 
-    img2 = eye2you.io_helper.PIL_to_cv2(img)
+    img2 = eye2you.image_helper.PIL_to_cv2(img)
     assert isinstance(img2, np.ndarray)
     prediction2 = default_service.classify_image(img2)
     np.testing.assert_allclose(prediction, prediction2)

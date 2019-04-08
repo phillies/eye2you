@@ -653,3 +653,47 @@ class RetinaChecker():
 
         sampler = torch.utils.data.WeightedRandomSampler(sampling_weights, num_samples, True)
         return sampler
+
+
+class VesselDetector():
+
+    def __init__(self, device=None):
+        self.device = device
+        self.config = None
+
+        self.model = None
+        self.model_name = None
+        self.optimizer = None
+        self.optimizer_name = None
+        self.scheduler = None
+        self.criterion = None
+        self.criterion_name = None
+
+        self.model_kwargs = {}
+
+        self.train_file = None
+        self.train_root = None
+        self.test_file = None
+        self.test_root = None
+
+        self.train_dataset = None
+        self.test_dataset = None
+        self.split_indices = None
+        self.classes = None
+        self.normalize_mean = None
+        self.normalize_std = None
+        self.image_size = None
+
+        self.train_loader = None
+        self.test_loader = None
+
+        self.start_epoch = 0
+        self.epoch = 0
+
+        self.learning_rate = None
+        self.learning_rate_decay_gamma = None
+        self.learning_rate_decay_step_size = None
+
+        self.evaluate_performance = all_or_nothing_performance
+
+        self.initialized = False

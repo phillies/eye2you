@@ -75,54 +75,12 @@ def find_classes(directory):
     return classes, class_to_idx
 
 
-def PIL_to_cv2(img):
-    '''Converts PIL uint8 image into numpy array. No conversion applied.
-    
-    Arguments:
-        img {PIL.Image} -- PIL image object
-    
-    Returns:
-        numpy.array -- numpy array with same data as PIL image
-    '''
-
-    return np.array(img)
-
-
-def cv2_to_PIL(img, min_val=None, max_val=None):
-    '''Converts the cv2 image or numpy array of arbitrary scale to a PIL image with
-    uint8 format. Upper and lower bound for scaling can be given, e.g. 0.0 and 1.0, otherwise
-    min and max values of image are used for 0 and 255. No clipping is applied. Passing a lower
-    bound larger than the smallest value in the image can lead to values <0 and undefined behaviour
-    in the conversion.
-    
-    Arguments:
-        img {numpy.array} -- Numpy array compatible to PIL, e.g. h,w,1 or h,w,3 shaped
-    
-    Keyword Arguments:
-        min_val {float} -- lower bound for scaling (default: {None})
-        max_val {float} -- upper bound for scaling (default: {None})
-    
-    Returns:
-        [PIL.Image] -- PIL image in uint8 format
-    '''
-
-    if min_val is None:
-        min_val = img.min()
-    if max_val is None:
-        max_val = img.max()
-    img_scale = img - min_val
-    img_scale = img_scale / (max_val - min_val)
-    img_scale = (img_scale * 255).astype(np.ubyte)
-    pil_img = Image.fromarray(img_scale)
-    return pil_img
-
-
 def merge_models_from_checkpoints(checkpoints, device='cpu'):
     '''Extracts the model state_dict from a list of RetinaChecker checkpoints
     and returns the dictionaly with all models, example config and classes.
     Returns the first config and classes it finds. Make sure the checkpoints are
     compatible. Otherwise somewhere an exception will rise.
-    
+
     Arguments:
         checkpoints {tuple} -- Filenames of RetinaChecker checkpoints (or torch checkpoints)
 

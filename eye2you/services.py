@@ -411,7 +411,7 @@ class MultiService(Service):
             raise ValueError('unet_state cannot be None')
         super().initialize()
 
-        self.unet.load_state_dict(torch.load(self.unet_state), strict=False)
+        self.unet.load_state_dict(torch.load(self.unet_state, map_location=self.device), strict=False)
 
     def get_vessels(self, img, merge_image=False):
         #apply padding so that it is divisible by 2 if size < 512, else use sliding windows of 256?!?

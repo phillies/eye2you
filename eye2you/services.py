@@ -55,6 +55,8 @@ class Service():
         self.test_image_size_overscaling = None
         self.last_dataset = None
         self.last_loader = None
+        if device is None:
+            device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.device = device
         self.feature_extractor_hook = None
         if checkpoint is not None:
@@ -400,7 +402,7 @@ class MultiService(Service):
     def __init__(self, checkpoint=None, device=None, unet_depth=2, unet_state=None):
         super().__init__(checkpoint=None, device=device)
         self.checkpoint = checkpoint
-        self.unet = u_net(in_channels=3, out_channels=2, depth=unet_depth)
+        self.unet = u_net(in_channels=3, out_channels=2, depth=unet_depth).to(self.device)
         self.unet_depth = unet_depth
         self.unet_state = unet_state
         if checkpoint is not None and unet_state is not None:
@@ -411,7 +413,7 @@ class MultiService(Service):
             raise ValueError('unet_state cannot be None')
         super().initialize()
 
-        self.unet.load_state_dict(torch.load(self.unet_state), strict=False)
+        self.unet.load_state_dict(torch.load(self.unet_state, map_location=self.device), strict=False)
 
     def get_vessels(self, img, merge_image=False):
         #apply padding so that it is divisible by 2 if size < 512, else use sliding windows of 256?!?

@@ -16,6 +16,17 @@ from .models import u_net
 
 FEATURE_BLOBS = []
 
+def denormalize_transform(trans):
+    for t in trans.transforms:
+        if isinstance(t, torchvision.transforms.transforms.Normalize):
+            return denormalize(t)
+    return None
+
+def denormalize(normalize):
+    std = 1 / np.array(normalize.std)
+    mean = np.array(normalize.mean) * -1 * std
+    denorm = torchvision.transforms.Normalize(mean=mean, std=std)
+    return denorm
 
 def hook_feature(_module, _input, out, ii=0):
     FEATURE_BLOBS.append(out.data.cpu().numpy())
@@ -415,7 +426,7 @@ class MultiService(Service):
 
         self.unet.load_state_dict(torch.load(self.unet_state, map_location=self.device), strict=False)
 
-    def get_vessels(self, img, merge_image=False):
+    def get_vessels(self, img, merge_image=False, img_size=320, **kwargs):
         #apply padding so that it is divisible by 2 if size < 512, else use sliding windows of 256?!?
         if isinstance(img, np.ndarray):
             image = cv2_to_PIL(img)
@@ -426,11 +437,12 @@ class MultiService(Service):
 
         print('DEMO MODE: Rescaling image to 320x320 before vessel detection')
         transform = torchvision.transforms.Compose([
-            torchvision.transforms.Resize(int(320)),
-            torchvision.transforms.CenterCrop(320),
+            torchvision.transforms.Resize(int(img_size)),
+            torchvision.transforms.CenterCrop(img_size),
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize(self.retina_checker.normalize_mean, self.retina_checker.normalize_std)
         ])
+        denorm = denormalize_transform(transform)
         x_img = transform(image)
 
         #x_img = self.transform(image)
@@ -441,8 +453,9 @@ class MultiService(Service):
         del x_device, y_device
         label = (y_img[:, 1, :, :] > y_img[:, 0, :, :]).float().squeeze()
 
-        mask = self.get_retina_mask(float_to_uint8(torch_to_cv2(x_img)))
-
+        #mask = self.get_retina_mask(float_to_uint8(torch_to_cv2(denorm(x_img))), **kwargs)
+        mask = self.get_retina_mask(PIL_to_cv2(image.resize((label.shape[1], label.shape[0]))), **kwargs)
+        
         vessel = cv2_to_PIL(label.numpy() * mask)
         vessel = torchvision.transforms.Resize(image.size, interpolation=Image.NEAREST)(vessel)
 
@@ -453,23 +466,12 @@ class MultiService(Service):
             vessel = cv2_to_PIL(out)
         return vessel
 
-    def get_retina_mask(self, img):
+    def get_retina_mask(self, img, **kwargs):
         mask = np.zeros((img.shape[:2]), dtype=np.uint8)
         circle = find_retina_boxes(
             img,
             display=False,
-            dp=2.0,
-            param1=60,
-            param2=50,
-            minimum_circle_distance=0.2,
-            minimum_radius=0.4,
-            maximum_radius=0.65,
-            max_patch_size=800,
-            max_distance_center=0.05,
-            param1_limit=40,
-            param1_step=10,
-            param2_limit=20,
-            param2_step=10)
+            **kwargs)
         x, y, r_in, r_out, output = circle
 
         cv2.circle(mask, (x, y), r_out - 1, (255), cv2.FILLED)

@@ -472,7 +472,10 @@ class MultiService(Service):
             img,
             display=False,
             **kwargs)
-        x, y, r_in, r_out, output = circle
+        if circle is None:
+            mask = mask + 1
+        else:
+            x, y, r_in, r_out, output = circle
 
-        cv2.circle(mask, (x, y), r_out - 1, (255), cv2.FILLED)
+            cv2.circle(mask, (x, y), r_out - 1, (255), cv2.FILLED)
         return mask

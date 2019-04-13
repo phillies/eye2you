@@ -10,6 +10,7 @@ import torch
 import torch.nn as nn
 import eye2you.models as models
 import torchvision.transforms as transforms  # pylint: disable=unresolved-import
+from PIL import Image
 
 from .datasets import PandasDataset
 from .meter_functions import AccuracyMeter, AverageMeter, all_or_nothing_performance
@@ -297,7 +298,7 @@ class RetinaChecker():
         in the training set, i.e. even if the class distribution in the
         data set is biased, all classes are equally contained in the sampling.
         No specific sampler for test data.
-        
+
         Keyword Arguments:
             num_workers {int} -- [description] (default: {8})
             sampling_relevance {[type]} -- [description] (default: {None})
@@ -334,9 +335,9 @@ class RetinaChecker():
                    test_accuracy=None,
                    test_confusion=None):
         """Save the current state of the model including history of training and test performance (optionally)
-        
+
         Arguments:
-            filename {string} -- target filename        
+            filename {string} -- target filename
             train_loss {torch.Array} -- tensor of training losses
             train_accuracy {torch.Array} -- tensor of training accuracy
             test_loss {torch.Array} -- tensor of test losses
@@ -452,7 +453,7 @@ class RetinaChecker():
     def _get_training_transform(self, normalize_factors=None):
 
         rotation_angle = self.config['transform'].getint('rotation angle', 0)
-        rotation = transforms.RandomRotation(rotation_angle)
+        rotation = transforms.RandomRotation(rotation_angle, resample=Image.BILINEAR, expand=False)
 
         brightness = self.config['transform'].getfloat('brightness', 0)
         contrast = self.config['transform'].getfloat('contrast', 0)
@@ -460,13 +461,16 @@ class RetinaChecker():
         hue = self.config['transform'].getfloat('hue', 0)
         min_scale = self.config['transform'].getfloat('min scale', 0.25)
         max_scale = self.config['transform'].getfloat('max scale', 1.0)
+        min_ratio = self.config['transform'].getfloat('min ratio', 3 / 4.)
+        max_ratio = self.config['transform'].getfloat('max ratio', 4 / 3.)
         color_jitter = transforms.RandomApply(
             [transforms.ColorJitter(brightness=brightness, contrast=contrast, saturation=saturation, hue=hue)])
 
         #randcrop = transforms.RandomChoice(
         #    (transforms.RandomResizedCrop(size=self.image_size, scale=(min_scale, max_scale), ratio=(1, 1)),
         #     transforms.RandomResizedCrop(size=self.image_size, scale=(min_scale, 0.4), ratio=(0.8, 1.25))))
-        randcrop = transforms.RandomResizedCrop(size=self.image_size, scale=(min_scale, max_scale), ratio=(1, 1))
+        randcrop = transforms.RandomResizedCrop(
+            size=self.image_size, scale=(min_scale, max_scale), ratio=(min_ratio, max_ratio))
 
         transform_list = []
         if brightness != 0 or contrast != 0 or saturation != 0 or hue != 0:
@@ -508,7 +512,7 @@ class RetinaChecker():
 
     def train(self, evaluate_performance=None):
         '''Deep learning training function to optimize the network with all images in the train_loader.
-        
+
         Returns:
             AverageMeter -- training loss
             AccuracyMeter -- training accuracy
@@ -566,12 +570,12 @@ class RetinaChecker():
 
     def validate(self, test_loader=None, evaluate_performance=None, confusion_matrix_label=None):
         '''Evaluates the model given the criterion and the data in test_loader
-        
+
         Arguments:
-            test_loader {torch.utils.data.DataLoader} -- contains the data for training, if None takes internal test_loader  
+            test_loader {torch.utils.data.DataLoader} -- contains the data for training, if None takes internal test_loader
             evaluate_performance {function} -- evaluation function for the accuracy of the output (default: function with correct only if all labels are correct)
-            confusion_matrix_label {int} -- on which dimension of the output should the confusion matrix be calculated. Takes 5 or the highest dimension, whichever is smaller {default: None}   
-        
+            confusion_matrix_label {int} -- on which dimension of the output should the confusion matrix be calculated. Takes 5 or the highest dimension, whichever is smaller {default: None}
+
         Returns:
             AverageMeter -- training loss
             AccuracyMeter -- training accuracy
@@ -622,11 +626,11 @@ class RetinaChecker():
     def _get_sampler(self, dataset, num_samples, relevant_slice=None):
         '''The distribution of samples in training and test data is not equal, i.e.
         the normal class is over represented. To get an unbiased sample (for example with 5
-        classes each class should make up for about 20% of the samples) we calculate the 
-        probability of each class in the source data (=weights) then we invert the weights 
+        classes each class should make up for about 20% of the samples) we calculate the
+        probability of each class in the source data (=weights) then we invert the weights
         and assign to each sample in the class the inverted probability (normalized to 1 over
         all samples) and use this as the probability for the weighted random sampler.
-            
+
         Arguments:
             dataset {torch.util.data.Dataset} -- the dataset to sample from
             num_samples {int} -- number of samples to be drawn bei the sampler

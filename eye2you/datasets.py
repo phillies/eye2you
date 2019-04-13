@@ -17,10 +17,10 @@ from .image_helper import parallel_variance
 
 class PandasDataset(torch.utils.data.Dataset):
     """[summary]
-    
+
     Arguments:
         data {[type]} -- [description]
-    
+
     Returns:
         [type] -- [description]
     """
@@ -81,21 +81,21 @@ class PandasDataset(torch.utils.data.Dataset):
         """Splitting the Dataset into test and training set. Uses scikit StratifiedShuffleSplit
         to keep the distribution of classes equal in test and training. Parameters are identical
         (as of scikit 0.20).
-        
+
         Keyword Arguments:
-            test_size {float/int} -- If float, should be between 0.0 and 1.0 and represent the proportion 
-            of the dataset to include in the test split. If int, represents the absolute number of 
-            test samples. If None, the value is set to the complement of the train size. By default, 
-            the value is set to 0.1. The default will change in version 0.21. It will remain 0.1 only 
+            test_size {float/int} -- If float, should be between 0.0 and 1.0 and represent the proportion
+            of the dataset to include in the test split. If int, represents the absolute number of
+            test samples. If None, the value is set to the complement of the train size. By default,
+            the value is set to 0.1. The default will change in version 0.21. It will remain 0.1 only
             if train_size is unspecified, otherwise it will complement the specified train_size. (default: {0.1})
 
-            train_size {float/int} -- If float, should be between 0.0 and 1.0 and represent the proportion 
-            of the dataset to include in the train split. If int, represents the absolute number of 
+            train_size {float/int} -- If float, should be between 0.0 and 1.0 and represent the proportion
+            of the dataset to include in the train split. If int, represents the absolute number of
             train samples. If None, the value is automatically set to the complement of the test size.
             (default: {None})
 
-            random_state {int/RandomState} -- If int, random_state is the seed used by the random number generator; 
-            If RandomState instance, random_state is the random number generator; If None, the random 
+            random_state {int/RandomState} -- If int, random_state is the seed used by the random number generator;
+            If RandomState instance, random_state is the random number generator; If None, the random
             number generator is the RandomState instance used by np.random. (default: {None})
 
             return_indices {list} -- List where the indices of the split will be appended. (default: {None})
@@ -453,6 +453,7 @@ class SegmentationDatasetWithSampler(SegmentationDataset):
                          normalize=False):
         self.random_resized_crop = torchvision.transforms.RandomResizedCrop(
             size=size, scale=scale, ratio=ratio, interpolation=interpolation)
+        self.rotation = torchvision.transforms.RandomRotation(180)
         self.normalize = normalize
 
     def __getitem__(self, index):
@@ -466,15 +467,36 @@ class SegmentationDatasetWithSampler(SegmentationDataset):
             sample = Image.open(self.samples[index])
             target = Image.open(self.targets[index])
 
+        angle = self.rotation.get_params(self.rotation.degrees)
+        sample = F.rotate(sample, angle, Image.BILINEAR, self.rotation.expand, self.rotation.center)
+        target = F.rotate(target, angle, Image.NEAREST, self.rotation.expand, self.rotation.center)
+
         i, j, h, w = self.random_resized_crop.get_params(sample, self.random_resized_crop.scale,
                                                          self.random_resized_crop.ratio)
         sample = F.resized_crop(sample, i, j, h, w, self.random_resized_crop.size,
                                 self.random_resized_crop.interpolation)
         target = F.resized_crop(target, i, j, h, w, self.random_resized_crop.size, Image.NEAREST)
+
         sample = self.transform(sample)
         target = self.target_transform(target)
+
         if self.normalize:
             sample = self.normalize_transform(sample)
+
+        return sample, target
+
+    def rotate_entries(sample, target):
+        angle = self.rotation.get_params(self.rotation.degrees)
+        sample = F.rotate(sample, angle, Image.BILINEAR, self.rotation.expand, self.rotation.center)
+        target = F.rotate(target, angle, Image.NEAREST, self.rotation.expand, self.rotation.center)
+        return sample, target
+
+    def resize_crop_entries(sample, target):
+        i, j, h, w = self.random_resized_crop.get_params(sample, self.random_resized_crop.scale,
+                                                         self.random_resized_crop.ratio)
+        sample = F.resized_crop(sample, i, j, h, w, self.random_resized_crop.size,
+                                self.random_resized_crop.interpolation)
+        target = F.resized_crop(target, i, j, h, w, self.random_resized_crop.size, Image.NEAREST)
         return sample, target
 
     def preload(self):

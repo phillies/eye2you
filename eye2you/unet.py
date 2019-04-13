@@ -4,15 +4,20 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-def u_net128(in_channels=3, out_channels=2, sigmoid=False):
-    return Unet128(in_channels=in_channels, out_channels=out_channels, sigmoid=sigmoid)
-
-
-def u_net256(in_channels=3, out_channels=2, sigmoid=False):
-    return Unet256(in_channels=in_channels, out_channels=out_channels, sigmoid=sigmoid)
-
-
 def u_net(in_channels=3, out_channels=2, depth=2, bias=False, final_layer='sigmoid'):
+    UnetClass = None
+    if depth == 1:
+        UnetClass = Unet1
+    elif depth == 2:
+        UnetClass = Unet2
+    elif depth == 3:
+        UnetClass = Unet3
+    else:
+        UnetClass = Unet4
+    return UnetClass(in_channels=in_channels, out_channels=out_channels, final_layer=final_layer)
+
+
+def u_net_rec(in_channels=3, out_channels=2, depth=2, bias=False, final_layer='sigmoid'):
     return Unet(
         in_channels=in_channels,
         out_channels=out_channels,
@@ -90,9 +95,9 @@ class Unet(nn.Module):
         return x
 
 
-class Unet128(nn.Module):
+class Unet1(nn.Module):
 
-    def __init__(self, in_channels=3, out_channels=2, sigmoid=False):
+    def __init__(self, in_channels=3, out_channels=2, final_layer=False):
         super().__init__()
 
         self.block1 = BasicBlock2d(in_channels, 64)
@@ -107,10 +112,12 @@ class Unet128(nn.Module):
 
         self.out = nn.Conv2d(in_channels=64, out_channels=out_channels, kernel_size=1, padding=0, bias=False)
 
-        if sigmoid:
+        if final_layer == 'sigmoid':
             self.final = nn.Sigmoid()
-        else:
+        elif final_layer == 'softmax':
             self.final = nn.Softmax(dim=1)
+        else:
+            self.final = lambda x: x
 
     def forward(self, x):
         x = self.block1(x)
@@ -130,9 +137,9 @@ class Unet128(nn.Module):
         return x
 
 
-class Unet256(nn.Module):
+class Unet2(nn.Module):
 
-    def __init__(self, in_channels=3, out_channels=2, sigmoid=False):
+    def __init__(self, in_channels=3, out_channels=2, final_layer=False):
         super().__init__()
 
         self.block1 = BasicBlock2d(in_channels, 64)
@@ -154,31 +161,29 @@ class Unet256(nn.Module):
 
         self.out = nn.Conv2d(in_channels=64, out_channels=out_channels, kernel_size=1, padding=0, bias=False)
 
-        if sigmoid:
+        if final_layer == 'sigmoid':
             self.final = nn.Sigmoid()
-        else:
+        elif final_layer == 'softmax':
             self.final = nn.Softmax(dim=1)
+        else:
+            self.final = lambda x: x
 
     def forward(self, x):
         x = self.block1(x)
         x_res1 = x.clone()
-
         x = self.max1(x)
 
         x = self.block2(x)
         x_res2 = x.clone()
-
         x = self.max2(x)
 
         x = self.block3(x)
 
         x = self.upconv1(x)
-
         x = torch.cat((x, x_res2), dim=1)
         x = self.block4(x)
 
         x = self.upconv2(x)
-
         x = torch.cat((x, x_res1), dim=1)
         x = self.block5(x)
 
@@ -187,12 +192,158 @@ class Unet256(nn.Module):
         return x
 
 
+class Unet3(nn.Module):
+
+    def __init__(self, in_channels=3, out_channels=2, final_layer=False, bias=False):
+        super().__init__()
+
+        self.inblock1 = BasicBlock2d(in_channels, 64)
+        self.max1 = nn.MaxPool2d(kernel_size=2)
+
+        self.inblock2 = BasicBlock2d(64, 128)
+        self.max2 = nn.MaxPool2d(kernel_size=2)
+
+        self.inblock3 = BasicBlock2d(128, 256)
+        self.max3 = nn.MaxPool2d(kernel_size=2)
+
+        self.inner = BasicBlock2d(256, 512)
+
+        self.upconv3 = UpConv2d(in_channels=512, out_channels=256)
+        self.outblock3 = BasicBlock2d(512, 256)
+
+        self.upconv2 = UpConv2d(in_channels=256, out_channels=128)
+        self.outblock2 = BasicBlock2d(256, 128)
+
+        self.upconv1 = UpConv2d(in_channels=128, out_channels=64)
+        self.outblock1 = BasicBlock2d(128, 64)
+
+        self.out = nn.Conv2d(in_channels=64, out_channels=out_channels, kernel_size=1, padding=0, bias=False)
+
+        if final_layer == 'sigmoid':
+            self.final = nn.Sigmoid()
+        elif final_layer == 'softmax':
+            self.final = nn.Softmax(dim=1)
+        else:
+            self.final = lambda x: x
+
+    def forward(self, x):
+        x = self.inblock1(x)
+        x_res1 = x.clone()
+        x = self.max1(x)
+
+        x = self.inblock2(x)
+        x_res2 = x.clone()
+        x = self.max2(x)
+
+        x = self.inblock3(x)
+        x_res3 = x.clone()
+        x = self.max3(x)
+
+        x = self.inner(x)
+
+        x = self.upconv3(x)
+        x = torch.cat((x, x_res3), dim=1)
+        x = self.outblock3(x)
+
+        x = self.upconv2(x)
+        x = torch.cat((x, x_res2), dim=1)
+        x = self.outblock2(x)
+
+        x = self.upconv1(x)
+        x = torch.cat((x, x_res1), dim=1)
+        x = self.outblock1(x)
+
+        x = self.out(x)
+        x = self.final(x)
+        return x
+
+
+class Unet4(nn.Module):
+
+    def __init__(self, in_channels=3, out_channels=2, final_layer=False):
+        super().__init__()
+
+        self.inblock1 = BasicBlock2d(in_channels, 64)
+        self.max1 = nn.MaxPool2d(kernel_size=2)
+
+        self.inblock2 = BasicBlock2d(64, 128)
+        self.max2 = nn.MaxPool2d(kernel_size=2)
+
+        self.inblock3 = BasicBlock2d(128, 256)
+        self.max3 = nn.MaxPool2d(kernel_size=2)
+
+        self.inblock4 = BasicBlock2d(256, 512)
+        self.max4 = nn.MaxPool2d(kernel_size=2)
+
+        self.inner = BasicBlock2d(512, 1024)
+
+        self.upconv4 = UpConv2d(in_channels=1024, out_channels=512)
+        self.outblock4 = BasicBlock2d(1024, 512)
+
+        self.upconv3 = UpConv2d(in_channels=512, out_channels=256)
+        self.outblock3 = BasicBlock2d(512, 256)
+
+        self.upconv2 = UpConv2d(in_channels=256, out_channels=128)
+        self.outblock2 = BasicBlock2d(256, 128)
+
+        self.upconv1 = UpConv2d(in_channels=128, out_channels=64)
+        self.outblock1 = BasicBlock2d(128, 64)
+
+        self.out = nn.Conv2d(in_channels=64, out_channels=out_channels, kernel_size=1, padding=0, bias=False)
+
+        if final_layer == 'sigmoid':
+            self.final = nn.Sigmoid()
+        elif final_layer == 'softmax':
+            self.final = nn.Softmax(dim=1)
+        else:
+            self.final = lambda x: x
+
+    def forward(self, x):
+        x = self.inblock1(x)
+        x_res1 = x.clone()
+        x = self.max1(x)
+
+        x = self.inblock2(x)
+        x_res2 = x.clone()
+        x = self.max2(x)
+
+        x = self.inblock3(x)
+        x_res3 = x.clone()
+        x = self.max3(x)
+
+        x = self.inblock4(x)
+        x_res4 = x.clone()
+        x = self.max4(x)
+
+        x = self.inner(x)
+
+        x = self.upconv4(x)
+        x = torch.cat((x, x_res4), dim=1)
+        x = self.outblock4(x)
+
+        x = self.upconv3(x)
+        x = torch.cat((x, x_res3), dim=1)
+        x = self.outblock3(x)
+
+        x = self.upconv2(x)
+        x = torch.cat((x, x_res2), dim=1)
+        x = self.outblock2(x)
+
+        x = self.upconv1(x)
+        x = torch.cat((x, x_res1), dim=1)
+        x = self.outblock1(x)
+
+        x = self.out(x)
+        x = self.final(x)
+        return x
+
+
 class BasicBlock2d(nn.Module):
-    '''Basic 2D convolution block with 2 consecutive 2D convolutions with 
+    '''Basic 2D convolution block with 2 consecutive 2D convolutions with
     batch normalization and reLU activation after each convolution
     '''
 
-    def __init__(self, in_channels, out_channels, kernel_size=3, padding=1, stride=1, bias=False):
+    def __init__(self, in_channels, out_channels, kernel_size=3, padding=1, stride=1, bias=False, momentum=0.1):
         super().__init__()
         self.conv1 = nn.Conv2d(
             in_channels=in_channels,
@@ -201,7 +352,7 @@ class BasicBlock2d(nn.Module):
             padding=padding,
             stride=stride,
             bias=bias)
-        self.bn1 = nn.BatchNorm2d(out_channels)
+        self.bn1 = nn.BatchNorm2d(out_channels, momentum=momentum)
         self.relu1 = nn.ReLU()
         self.conv2 = nn.Conv2d(
             in_channels=out_channels,
@@ -210,7 +361,7 @@ class BasicBlock2d(nn.Module):
             padding=padding,
             stride=stride,
             bias=bias)
-        self.bn2 = nn.BatchNorm2d(out_channels)
+        self.bn2 = nn.BatchNorm2d(out_channels, momentum=momentum)
         self.relu2 = nn.ReLU()
 
     def forward(self, x_in):
@@ -224,7 +375,7 @@ class BasicBlock2d(nn.Module):
 
 
 class UpConv2d(nn.Module):
-    """Upconvolution - 2D transpose convolution (sometimes called deconvolution) to upsample the image. 
+    """Upconvolution - 2D transpose convolution (sometimes called deconvolution) to upsample the image.
     Default parameters create a 2x2 transposed convolution with stride=2 to upsample by factor 2.
     """
 

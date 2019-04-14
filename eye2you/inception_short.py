@@ -241,6 +241,7 @@ class Inception3SPlus(nn.Module):
         self.Mixed_6c = InceptionC(768, channels_7x7=160)
         self.Mixed_6d = InceptionC(768, channels_7x7=160)
         self.Mixed_6e = InceptionC(768, channels_7x7=192)
+        self.Vessel = BasicConv3d(768, 768, kernel_size=(2, 1, 1))
         self.fc = nn.Linear(768, num_classes)
 
         for m in self.modules():
@@ -255,7 +256,7 @@ class Inception3SPlus(nn.Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self, x):
+    def forward(self, x, mask):
         #if self.transform_input:
         #    x_ch0 = torch.unsqueeze(x[:, 0], 1) * (0.229 / 0.5) + (0.485 - 0.5) / 0.5
         #    x_ch1 = torch.unsqueeze(x[:, 1], 1) * (0.224 / 0.5) + (0.456 - 0.5) / 0.5
@@ -309,16 +310,23 @@ class Inception3SPlus(nn.Module):
         print(x.shape)
         # 17 x 17 x 768
         x = self.Mixed_6e(x)
-        print(x.shape)
+        print(x.shape, mask.shape)
         # 17 x 17 x 768
-        x = F.adaptive_avg_pool2d(x, (1, 1))
+        mask = F.adaptive_avg_pool2d(mask, (x.shape[2:]))
+        print(x.shape, mask.shape)
+        mask = F.conv2d(mask, torch.ones((768, 1, 1, 1)))
+        x = torch.stack((x, mask), dim=2)
+        print(x.shape)
+        x = self.Vessel(x)
+        print(x.shape)
+        x = F.adaptive_avg_pool2d(x.squeeze(dim=2), (1, 1))
         print(x.shape)
         # 1 x 1 x 2048
         x = F.dropout(x, training=self.training)
         print(x.shape)
         # 1 x 1 x 2048
         x = x.view(x.size(0), -1)
-        print(x.shape)
+        print(x.shape, 'mm')
         # 2048
         x = self.fc(x)
         print(x.shape)
@@ -326,3 +334,16 @@ class Inception3SPlus(nn.Module):
         if self.training and self.aux_logits:
             return x, aux
         return x
+
+
+class BasicConv3d(nn.Module):
+
+    def __init__(self, in_channels, out_channels, **kwargs):
+        super().__init__()
+        self.conv = nn.Conv3d(in_channels, out_channels, bias=False, **kwargs)
+        self.bn = nn.BatchNorm3d(out_channels, eps=0.001)
+
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.bn(x)
+        return F.relu(x, inplace=True)

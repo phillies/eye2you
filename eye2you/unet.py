@@ -353,7 +353,7 @@ class BasicBlock2d(nn.Module):
             stride=stride,
             bias=bias)
         self.bn1 = nn.BatchNorm2d(out_channels, momentum=momentum)
-        self.relu1 = nn.ReLU()
+        self.relu1 = nn.ReLU(inplace=True)
         self.conv2 = nn.Conv2d(
             in_channels=out_channels,
             out_channels=out_channels,
@@ -362,7 +362,7 @@ class BasicBlock2d(nn.Module):
             stride=stride,
             bias=bias)
         self.bn2 = nn.BatchNorm2d(out_channels, momentum=momentum)
-        self.relu2 = nn.ReLU()
+        self.relu2 = nn.ReLU(inplace=True)
 
     def forward(self, x_in):
         x = self.conv1(x_in)
@@ -379,7 +379,15 @@ class UpConv2d(nn.Module):
     Default parameters create a 2x2 transposed convolution with stride=2 to upsample by factor 2.
     """
 
-    def __init__(self, in_channels, out_channels, kernel_size=2, padding=0, stride=2, bias=False, batch_norm=False):
+    def __init__(self,
+                 in_channels,
+                 out_channels,
+                 kernel_size=2,
+                 padding=0,
+                 stride=2,
+                 bias=False,
+                 batch_norm=False,
+                 relu=False):
         super().__init__()
         #self.up = nn.Upsample(scale_factor=2, mode='nearest')
         self.conv = nn.ConvTranspose2d(
@@ -393,10 +401,16 @@ class UpConv2d(nn.Module):
             self.bn = nn.BatchNorm2d(out_channels)
         else:
             self.bn = None
+        if relu:
+            self.relu = nn.ReLU(inplace=True)
+        else:
+            self.relu = None
 
     def forward(self, x):
         #x = self.up(x)
         x = self.conv(x)
         if not self.bn is None:
             x = self.bn(x)
+        if not self.relu is None:
+            x = self.relu(x)
         return x

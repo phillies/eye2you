@@ -108,7 +108,7 @@ def cv2_to_torch(img):
     '''
     img = np.transpose(img, axes=(1, 2, 0))
     torch_img = torch.Tensor(img).unsqueeze(0)
-    return pil_img
+    return torch_img
 
 
 def split_tensor_image(img, patch_size):
@@ -222,20 +222,6 @@ def merge_labels(labels, img_size, stride=1, minimum_matches=0):
             img[ii * s_h:ii * s_h + p_h, jj * s_w:jj * s_w + p_w] += labels[ii * n_w + n_h, :, :]
     img = torch.clamp(img, 0, 1)
     return img
-
-
-def measure_iou(output, label):
-    ious = []
-    for ii in range(output.shape[0]):
-        out = (output[ii, ...] > 0.5).detach().cpu().numpy()
-        lab = (label[ii, ...] > 0.5).detach().cpu().numpy()
-        union = out | lab
-        intersect = out & lab
-        iou = intersect.sum() / union.sum()
-        if union.sum() == 0:
-            iou = 0
-        ious.append(iou)
-    return ious
 
 
 def sample_patches(images, labels, patch_size, number_patches):

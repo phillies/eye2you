@@ -327,7 +327,7 @@ class SegmentationDataset(torch.utils.data.Dataset):
         if index >= self.__len__():
             raise ValueError('Index {} out of bounds for dataset with length {}'.format(index, self.__len__()))
 
-        if self.mask is None:
+        if self.masks is None:
             mask = torch.ones_like(self.get_sample(index))
         elif self.loaded:
             mask = self.target_transform(self.masks_data[index])
@@ -485,13 +485,13 @@ class SegmentationDatasetWithSampler(SegmentationDataset):
 
         return sample, target
 
-    def rotate_entries(sample, target):
+    def rotate_entries(self, sample, target):
         angle = self.rotation.get_params(self.rotation.degrees)
         sample = F.rotate(sample, angle, Image.BILINEAR, self.rotation.expand, self.rotation.center)
         target = F.rotate(target, angle, Image.NEAREST, self.rotation.expand, self.rotation.center)
         return sample, target
 
-    def resize_crop_entries(sample, target):
+    def resize_crop_entries(self, sample, target):
         i, j, h, w = self.random_resized_crop.get_params(sample, self.random_resized_crop.scale,
                                                          self.random_resized_crop.ratio)
         sample = F.resized_crop(sample, i, j, h, w, self.random_resized_crop.size,
@@ -513,3 +513,66 @@ class SegmentationDatasetWithSampler(SegmentationDataset):
         tmp = '    Target Transforms (if any): '
         fmt_str += '{0}{1}'.format(tmp, self.target_transform.__repr__().replace('\n', '\n' + ' ' * len(tmp)))
         return fmt_str
+
+
+class VesselDataset(torch.utils.data.Dataset):
+
+    def __init__(self):
+        super().__init__()
+        self.samples = None
+        self.segmentations = None
+        self.targets = None
+        self.masks = None
+        self.classes = None
+        self.transform = torchvision.transforms.ToTensor()
+        self.mean = np.array([0.3198, 0.1746, 0.0901])
+        self.std = np.array([0.2287, 0.1286, 0.0723])
+        self.normalize = None
+
+        self.rotation = None
+        self.random_resized_crop = None
+
+    def __len__(self):
+        return len(self.samples)
+
+    def load_csv(self, filename, root=''):
+        df = pd.read_csv(filename, index_col=0)
+        self.samples = [str(Path(root) / Path(ind)) for ind in df.index]
+        self.segmentations = [os.path.splitext(f)[0] + '_vessel.png' for f in self.samples]
+        self.classes = df.columns
+        self.targets = df.iloc[:].values.astype(np.float32)
+        return self
+
+    def set_transforms(self, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.), angle=180):
+        self.random_resized_crop = torchvision.transforms.RandomResizedCrop(size=size, scale=scale, ratio=ratio)
+        self.rotation = torchvision.transforms.RandomRotation(angle)
+        self.normalize = torchvision.transforms.Normalize(self.mean, self.std)
+        return self
+
+    def __getitem__(self, index):
+        if index >= self.__len__():
+            raise ValueError('Index {} out of bounds for dataset with length {}'.format(index, self.__len__()))
+
+        sample = Image.open(self.samples[index])
+        segment = Image.open(self.segmentations[index])
+        target = self.targets[index]
+
+        if self.rotation is not None:
+            angle = self.rotation.get_params(self.rotation.degrees)
+            sample = F.rotate(sample, angle, Image.BILINEAR, self.rotation.expand, self.rotation.center)
+            segment = F.rotate(segment, angle, Image.NEAREST, self.rotation.expand, self.rotation.center)
+
+        if self.random_resized_crop is not None:
+            i, j, h, w = self.random_resized_crop.get_params(sample, self.random_resized_crop.scale,
+                                                            self.random_resized_crop.ratio)
+            sample = F.resized_crop(sample, i, j, h, w, self.random_resized_crop.size, Image.BILINEAR)
+            segment = F.resized_crop(segment, i, j, h, w, self.random_resized_crop.size, Image.NEAREST)
+
+        if self.transform is not None:
+            sample = self.transform(sample)
+            segment = self.transform(segment)
+
+        if self.normalize is not None:
+            sample = self.normalize(sample)
+
+        return (sample, segment), target

@@ -1,4 +1,5 @@
 import torch.nn as nn
+import numpy as np
 
 
 def single_output_performance(labels, outputs, feature_number=5):
@@ -23,16 +24,16 @@ def all_or_nothing_performance(labels, outputs):
 
 class AverageMeter(object):
     """Computes and stores the average and current value
-    
-    Usage: 
+
+    Usage:
     am = AverageMeter()
     am.update(123)
     am.update(456)
     am.update(789)
-    
+
     last_value = am.val
     average_value = am.avg
-    
+
     am.reset() #set all to 0"""
 
     def __init__(self):
@@ -56,9 +57,9 @@ class AverageMeter(object):
 
 class AccuracyMeter(object):
     """Computes and stores the correctly classified samples
-    
+
     Usage: pass the number of correct (val) and the total number (n)
-    of samples to update(val, n). Then .avg contains the 
+    of samples to update(val, n). Then .avg contains the
     percentage correct.
     """
 
@@ -76,3 +77,213 @@ class AccuracyMeter(object):
         self.sum += val
         self.count += n
         self.avg = self.sum / self.count
+
+
+def measure_iou(output, label):
+    ious = []
+    for ii in range(output.shape[0]):
+        out = (output[ii, ...] > 0.5).detach().cpu().numpy()
+        lab = (label[ii, ...] > 0.5).detach().cpu().numpy()
+        union = out | lab
+        intersect = out & lab
+        iou = intersect.sum() / union.sum()
+        if union.sum() == 0:
+            iou = 0
+        ious.append(iou)
+    return ious
+
+
+def segmentation_accuracy(predictions, targets):
+    '''[summary]
+
+    Arguments:
+        predictions {[type]} -- [description]
+        targets {[type]} -- [description]
+
+    Raises:
+        ValueError -- [description]
+        ValueError -- [description]
+
+    Returns:
+        [type] -- [description]
+    '''
+
+    if not predictions.shape == targets.shape:
+        raise ValueError('Shape of targets {0} does not match shape of predictions {1}'.format(
+            targets.shape, predictions.shape))
+
+    n, c, h, w = predictions.shape
+    if c != 1:
+        raise ValueError('Only images with 1 channel supported')
+
+    res = np.empty(n)
+    for ii in range(n):
+        t = targets[ii, 0, :, :]
+        p = predictions[ii, 0, :, :]
+        correct = (t == p)
+        res[ii] = float(correct.sum()) / float(h * w)
+
+    return res
+
+
+def segmentation_iou(predictions, targets):
+    '''[summary]
+
+    Arguments:
+        predictions {[type]} -- [description]
+        targets {[type]} -- [description]
+    '''
+    if not predictions.shape == targets.shape:
+        raise ValueError('Shape of targets {0} does not match shape of predictions {1}'.format(
+            targets.shape, predictions.shape))
+
+    n, c, h, w = predictions.shape
+    if c != 1:
+        raise ValueError('Only images with 1 channel supported')
+
+    res = np.empty(n)
+    for ii in range(n):
+        t = targets[ii, 0, :, :]
+        p = predictions[ii, 0, :, :]
+        intersection = np.logical_and(t, p)
+        union = np.logical_or(t, p)
+        res[ii] = float(intersection.sum()) / float(union.sum())
+
+    return res
+
+
+def segmentation_precision(predictions, targets):
+    '''[summary]
+
+    Arguments:
+        predictions {[type]} -- [description]
+        targets {[type]} -- [description]
+
+    Raises:
+        ValueError -- [description]
+        ValueError -- [description]
+
+    Returns:
+        [type] -- [description]
+    '''
+
+    if not predictions.shape == targets.shape:
+        raise ValueError('Shape of targets {0} does not match shape of predictions {1}'.format(
+            targets.shape, predictions.shape))
+
+    n, c, h, w = predictions.shape
+    if c != 1:
+        raise ValueError('Only images with 1 channel supported')
+
+    res = np.empty(n)
+    for ii in range(n):
+        t = targets[ii, 0, :, :]
+        p = predictions[ii, 0, :, :]
+        correct = np.logical_and(t, p)
+        correct_plus_false_positive = np.logical_or(correct, p)
+        res[ii] = float(correct.sum()) / float(correct_plus_false_positive.sum())
+
+    return res
+
+
+def segmentation_recall(predictions, targets):
+    '''[summary]
+
+    Arguments:
+        predictions {[type]} -- [description]
+        targets {[type]} -- [description]
+
+    Raises:
+        ValueError -- [description]
+        ValueError -- [description]
+
+    Returns:
+        [type] -- [description]
+    '''
+
+    if not predictions.shape == targets.shape:
+        raise ValueError('Shape of targets {0} does not match shape of predictions {1}'.format(
+            targets.shape, predictions.shape))
+
+    n, c, h, w = predictions.shape
+    if c != 1:
+        raise ValueError('Only images with 1 channel supported')
+
+    res = np.empty(n)
+    for ii in range(n):
+        t = targets[ii, 0, :, :]
+        p = predictions[ii, 0, :, :]
+        correct = np.logical_and(t, p)
+        res[ii] = float(correct.sum()) / float(t.sum())
+
+    return res
+
+
+def segmentation_specificity(predictions, targets):
+    '''[summary]
+
+    Arguments:
+        predictions {[type]} -- [description]
+        targets {[type]} -- [description]
+
+    Raises:
+        ValueError -- [description]
+        ValueError -- [description]
+
+    Returns:
+        [type] -- [description]
+    '''
+
+    if not predictions.shape == targets.shape:
+        raise ValueError('Shape of targets {0} does not match shape of predictions {1}'.format(
+            targets.shape, predictions.shape))
+
+    n, c, h, w = predictions.shape
+    if c != 1:
+        raise ValueError('Only images with 1 channel supported')
+
+    res = np.empty(n)
+    for ii in range(n):
+        t = targets[ii, 0, :, :]
+        p = predictions[ii, 0, :, :]
+        correct = np.logical_and(1 - t, 1 - p)
+        res[ii] = float(correct.sum()) / float((1 - t).sum())
+
+    return res
+
+
+def segmentation_dice(predictions, targets):
+    '''[summary]
+
+    Arguments:
+        predictions {[type]} -- [description]
+        targets {[type]} -- [description]
+    '''
+    if not predictions.shape == targets.shape:
+        raise ValueError('Shape of targets {0} does not match shape of predictions {1}'.format(
+            targets.shape, predictions.shape))
+
+    n, c, h, w = predictions.shape
+    if c != 1:
+        raise ValueError('Only images with 1 channel supported')
+
+    res = np.empty(n)
+    for ii in range(n):
+        t = targets[ii, 0, :, :]
+        p = predictions[ii, 0, :, :]
+        intersection = np.logical_and(t, p)
+        union = np.logical_or(t, p)
+        res[ii] = float(2 * intersection.sum()) / float(union.sum() + intersection.sum())
+
+    return res
+
+
+def segmentation_all(predictions, targets):
+    return [
+        segmentation_accuracy(predictions, targets),
+        segmentation_precision(predictions, targets),
+        segmentation_recall(predictions, targets),
+        segmentation_specificity(predictions, targets),
+        segmentation_iou(predictions, targets),
+        segmentation_dice(predictions, targets)
+    ]

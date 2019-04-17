@@ -40,6 +40,17 @@ def inception_v3_xs(pretrained=False, **kwargs):
     return Inception3XS(**kwargs)
 
 
+def inception_v3_s_plus(pretrained=False, **kwargs):
+    if pretrained:
+        if 'transform_input' not in kwargs:
+            kwargs['transform_input'] = True
+        model = Inception3SPlus(**kwargs)
+        model.load_state_dict(model_zoo.load_url(model_urls['inception_v3_s']), strict=False)
+        return model
+
+    return Inception3S(**kwargs)
+
+
 class Inception3S(nn.Module):
 
     def __init__(self, num_classes=1000, aux_logits=True, transform_input=False, in_channels=3):
@@ -241,6 +252,9 @@ class Inception3SPlus(nn.Module):
         self.Mixed_6c = InceptionC(768, channels_7x7=160)
         self.Mixed_6d = InceptionC(768, channels_7x7=160)
         self.Mixed_6e = InceptionC(768, channels_7x7=192)
+        self.VesselMultiplier = nn.Conv2d(in_channels=1, out_channels=768, kernel_size=1, bias=False)
+        self.VesselMultiplier.weight.data.copy_(torch.ones((768, 1, 1, 1)))
+        self.VesselMultiplier.weight.requires_grad = False
         self.Vessel = BasicConv3d(768, 768, kernel_size=(2, 1, 1))
         self.fc = nn.Linear(768, num_classes)
 
@@ -262,74 +276,77 @@ class Inception3SPlus(nn.Module):
         #    x_ch1 = torch.unsqueeze(x[:, 1], 1) * (0.224 / 0.5) + (0.456 - 0.5) / 0.5
         #    x_ch2 = torch.unsqueeze(x[:, 2], 1) * (0.225 / 0.5) + (0.406 - 0.5) / 0.5
         #    x = torch.cat((x_ch0, x_ch1, x_ch2), 1)
-        print(x.shape)
+        #x = torch.cat((x, mask), dim=1)
+        #print(x.shape)
         # 299 x 299 x 3
         x = self.Conv2d_1a_3x3(x)
-        print(x.shape)
+        #print(x.shape)
         # 149 x 149 x 32
         x = self.Conv2d_2a_3x3(x)
-        print(x.shape)
+        #print(x.shape)
         # 147 x 147 x 32
         x = self.Conv2d_2b_3x3(x)
-        print(x.shape)
+        #print(x.shape)
         # 147 x 147 x 64
         x = F.max_pool2d(x, kernel_size=3, stride=2)
-        print(x.shape)
+        #print(x.shape)
         # 73 x 73 x 64
         x = self.Conv2d_3b_1x1(x)
-        print(x.shape)
+        #print(x.shape)
         # 73 x 73 x 80
         x = self.Conv2d_4a_3x3(x)
-        print(x.shape)
+        #print(x.shape)
         # 71 x 71 x 192
         x = F.max_pool2d(x, kernel_size=3, stride=2)
-        print(x.shape)
+        #print(x.shape)
         # 35 x 35 x 192
         x = self.Mixed_5b(x)
-        print(x.shape)
+        #print(x.shape)
         # 35 x 35 x 256
         x = self.Mixed_5c(x)
-        print(x.shape)
+        #print(x.shape)
         # 35 x 35 x 288
         x = self.Mixed_5d(x)
-        print(x.shape)
+        #print(x.shape)
         # 35 x 35 x 288
         if self.training and self.aux_logits:
             aux = self.AuxLogits(x)
         # 35 x 35 x 288
         x = self.Mixed_6a(x)
-        print(x.shape)
+        #print(x.shape)
         # 17 x 17 x 768
         x = self.Mixed_6b(x)
-        print(x.shape)
+        #print(x.shape)
         # 17 x 17 x 768
         x = self.Mixed_6c(x)
-        print(x.shape)
+        #print(x.shape)
         # 17 x 17 x 768
         x = self.Mixed_6d(x)
-        print(x.shape)
+        #print(x.shape)
         # 17 x 17 x 768
         x = self.Mixed_6e(x)
-        print(x.shape, mask.shape)
+        #print(x.shape, mask.shape)
         # 17 x 17 x 768
         mask = F.adaptive_avg_pool2d(mask, (x.shape[2:]))
-        print(x.shape, mask.shape)
-        mask = F.conv2d(mask, torch.ones((768, 1, 1, 1)))
+        #print(x.shape, mask.shape)
+        device = 'cpu' if not x.is_cuda else x.get_device()
+        mask = F.conv2d(mask, torch.ones((768, 1, 1, 1), device=device))
+        #mask = F.conv2d(mask, self.vessel_projection)
         x = torch.stack((x, mask), dim=2)
-        print(x.shape)
+        #print(x.shape)
         x = self.Vessel(x)
-        print(x.shape)
+        #print(x.shape)
         x = F.adaptive_avg_pool2d(x.squeeze(dim=2), (1, 1))
-        print(x.shape)
+        #print(x.shape)
         # 1 x 1 x 2048
         x = F.dropout(x, training=self.training)
-        print(x.shape)
+        #print(x.shape)
         # 1 x 1 x 2048
         x = x.view(x.size(0), -1)
-        print(x.shape, 'mm')
+        #print(x.shape, 'mm')
         # 2048
         x = self.fc(x)
-        print(x.shape)
+        #print(x.shape)
         # 1000 (num_classes)
         if self.training and self.aux_logits:
             return x, aux
@@ -347,3 +364,113 @@ class BasicConv3d(nn.Module):
         x = self.conv(x)
         x = self.bn(x)
         return F.relu(x, inplace=True)
+
+
+class Inception3SPlus2(nn.Module):
+
+    def __init__(self, in_channels=3, num_classes=1000, aux_logits=True, transform_input=False):
+        super().__init__()
+        self.aux_logits = aux_logits
+        self.transform_input = transform_input
+        self.Conv2d_1a_3x3 = BasicConv2d(in_channels, 32, kernel_size=3, stride=2)
+        self.Conv2d_2a_3x3 = BasicConv2d(32, 32, kernel_size=3)
+        self.Conv2d_2b_3x3 = BasicConv2d(32, 64, kernel_size=3, padding=1)
+        self.Conv2d_3b_1x1 = BasicConv2d(64, 80, kernel_size=1)
+        self.Conv2d_4a_3x3 = BasicConv2d(80, 192, kernel_size=3)
+        self.Mixed_5b = InceptionA(192, pool_features=32)
+        self.Mixed_5c = InceptionA(256, pool_features=64)
+        self.Mixed_5d = InceptionA(288, pool_features=64)
+        self.Mixed_6a = InceptionB(288)
+        if aux_logits:
+            self.AuxLogits = InceptionAux(288, num_classes)
+        self.Mixed_6b = InceptionC(768, channels_7x7=128)
+        self.Mixed_6c = InceptionC(768, channels_7x7=160)
+        self.Mixed_6d = InceptionC(768, channels_7x7=160)
+        self.Mixed_6e = InceptionC(768, channels_7x7=192)
+        self.fc = nn.Linear(768, num_classes)
+
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
+                import scipy.stats as stats
+                stddev = m.stddev if hasattr(m, 'stddev') else 0.1
+                X = stats.truncnorm(-2, 2, scale=stddev)
+                values = torch.Tensor(X.rvs(m.weight.numel()))
+                values = values.view(m.weight.size())
+                m.weight.data.copy_(values)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+
+    def forward(self, x, mask):
+        #if self.transform_input:
+        #    x_ch0 = torch.unsqueeze(x[:, 0], 1) * (0.229 / 0.5) + (0.485 - 0.5) / 0.5
+        #    x_ch1 = torch.unsqueeze(x[:, 1], 1) * (0.224 / 0.5) + (0.456 - 0.5) / 0.5
+        #    x_ch2 = torch.unsqueeze(x[:, 2], 1) * (0.225 / 0.5) + (0.406 - 0.5) / 0.5
+        #    x = torch.cat((x_ch0, x_ch1, x_ch2), 1)
+        x = torch.cat((x, mask), dim=1)
+        #print(x.shape)
+        # 299 x 299 x 3
+        x = self.Conv2d_1a_3x3(x)
+        #print(x.shape)
+        # 149 x 149 x 32
+        x = self.Conv2d_2a_3x3(x)
+        #print(x.shape)
+        # 147 x 147 x 32
+        x = self.Conv2d_2b_3x3(x)
+        #print(x.shape)
+        # 147 x 147 x 64
+        x = F.max_pool2d(x, kernel_size=3, stride=2)
+        #print(x.shape)
+        # 73 x 73 x 64
+        x = self.Conv2d_3b_1x1(x)
+        #print(x.shape)
+        # 73 x 73 x 80
+        x = self.Conv2d_4a_3x3(x)
+        #print(x.shape)
+        # 71 x 71 x 192
+        x = F.max_pool2d(x, kernel_size=3, stride=2)
+        #print(x.shape)
+        # 35 x 35 x 192
+        x = self.Mixed_5b(x)
+        #print(x.shape)
+        # 35 x 35 x 256
+        x = self.Mixed_5c(x)
+        #print(x.shape)
+        # 35 x 35 x 288
+        x = self.Mixed_5d(x)
+        #print(x.shape)
+        # 35 x 35 x 288
+        if self.training and self.aux_logits:
+            aux = self.AuxLogits(x)
+        # 35 x 35 x 288
+        x = self.Mixed_6a(x)
+        #print(x.shape)
+        # 17 x 17 x 768
+        x = self.Mixed_6b(x)
+        #print(x.shape)
+        # 17 x 17 x 768
+        x = self.Mixed_6c(x)
+        #print(x.shape)
+        # 17 x 17 x 768
+        x = self.Mixed_6d(x)
+        #print(x.shape)
+        # 17 x 17 x 768
+        x = self.Mixed_6e(x)
+        #print(x.shape, mask.shape)
+        # 17 x 17 x 768
+        #print(x.shape)
+        x = F.adaptive_avg_pool2d(x, (1, 1))
+        #print(x.shape)
+        # 1 x 1 x 2048
+        x = F.dropout(x, training=self.training)
+        #print(x.shape)
+        # 1 x 1 x 2048
+        x = x.view(x.size(0), -1)
+        #print(x.shape, 'mm')
+        # 2048
+        x = self.fc(x)
+        #print(x.shape)
+        # 1000 (num_classes)
+        if self.training and self.aux_logits:
+            return x, aux
+        return x

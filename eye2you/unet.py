@@ -83,6 +83,10 @@ class Unet(nn.Module):
         #print(x.size())
         x = self.up(x)
         #print(x.size())
+        h_pad = x_res.shape[2] - x.shape[2]
+        w_pad = x_res.shape[3] - x.shape[3]
+        x = nn.functional.pad(x, (0, w_pad, 0, h_pad), mode='constant', value=0)
+        #print(x.shape, x_res.shape)
         x = torch.cat((x_res, x), dim=1)
         del x_res
         #print(x.size())
@@ -129,11 +133,15 @@ class Unet1(nn.Module):
 
         x = self.upconv2(x)
 
+        h_pad = x_res1.shape[2] - x.shape[2]
+        w_pad = x_res1.shape[3] - x.shape[3]
+        x = nn.functional.pad(x, (0, w_pad, 0, h_pad), mode='constant', value=0)
         x = torch.cat((x, x_res1), dim=1)
         x = self.block5(x)
 
         x = self.out(x)
         x = self.final(x)
+        del x_res1
         return x
 
 
@@ -180,15 +188,22 @@ class Unet2(nn.Module):
         x = self.block3(x)
 
         x = self.upconv1(x)
+        h_pad = x_res2.shape[2] - x.shape[2]
+        w_pad = x_res2.shape[3] - x.shape[3]
+        x = nn.functional.pad(x, (0, w_pad, 0, h_pad), mode='constant', value=0)
         x = torch.cat((x, x_res2), dim=1)
         x = self.block4(x)
 
         x = self.upconv2(x)
+        h_pad = x_res1.shape[2] - x.shape[2]
+        w_pad = x_res1.shape[3] - x.shape[3]
+        x = nn.functional.pad(x, (0, w_pad, 0, h_pad), mode='constant', value=0)
         x = torch.cat((x, x_res1), dim=1)
         x = self.block5(x)
 
         x = self.out(x)
         x = self.final(x)
+        del x_res1, x_res2
         return x
 
 
@@ -242,19 +257,29 @@ class Unet3(nn.Module):
         x = self.inner(x)
 
         x = self.upconv3(x)
+        h_pad = x_res3.shape[2] - x.shape[2]
+        w_pad = x_res3.shape[3] - x.shape[3]
+        x = nn.functional.pad(x, (0, w_pad, 0, h_pad), mode='constant', value=0)
         x = torch.cat((x, x_res3), dim=1)
         x = self.outblock3(x)
 
         x = self.upconv2(x)
+        h_pad = x_res2.shape[2] - x.shape[2]
+        w_pad = x_res2.shape[3] - x.shape[3]
+        x = nn.functional.pad(x, (0, w_pad, 0, h_pad), mode='constant', value=0)
         x = torch.cat((x, x_res2), dim=1)
         x = self.outblock2(x)
 
         x = self.upconv1(x)
+        h_pad = x_res1.shape[2] - x.shape[2]
+        w_pad = x_res1.shape[3] - x.shape[3]
+        x = nn.functional.pad(x, (0, w_pad, 0, h_pad), mode='constant', value=0)
         x = torch.cat((x, x_res1), dim=1)
         x = self.outblock1(x)
 
         x = self.out(x)
         x = self.final(x)
+        del x_res1, x_res2, x_res3
         return x
 
 
@@ -318,23 +343,36 @@ class Unet4(nn.Module):
         x = self.inner(x)
 
         x = self.upconv4(x)
+        h_pad = x_res4.shape[2] - x.shape[2]
+        w_pad = x_res4.shape[3] - x.shape[3]
+        x = nn.functional.pad(x, (0, w_pad, 0, h_pad), mode='constant', value=0)
         x = torch.cat((x, x_res4), dim=1)
         x = self.outblock4(x)
 
         x = self.upconv3(x)
+        h_pad = x_res3.shape[2] - x.shape[2]
+        w_pad = x_res3.shape[3] - x.shape[3]
+        x = nn.functional.pad(x, (0, w_pad, 0, h_pad), mode='constant', value=0)
         x = torch.cat((x, x_res3), dim=1)
         x = self.outblock3(x)
 
         x = self.upconv2(x)
+        h_pad = x_res2.shape[2] - x.shape[2]
+        w_pad = x_res2.shape[3] - x.shape[3]
+        x = nn.functional.pad(x, (0, w_pad, 0, h_pad), mode='constant', value=0)
         x = torch.cat((x, x_res2), dim=1)
         x = self.outblock2(x)
 
         x = self.upconv1(x)
+        h_pad = x_res1.shape[2] - x.shape[2]
+        w_pad = x_res1.shape[3] - x.shape[3]
+        x = nn.functional.pad(x, (0, w_pad, 0, h_pad), mode='constant', value=0)
         x = torch.cat((x, x_res1), dim=1)
         x = self.outblock1(x)
 
         x = self.out(x)
         x = self.final(x)
+        del x_res1, x_res2, x_res3, x_res4
         return x
 
 
@@ -364,8 +402,8 @@ class BasicBlock2d(nn.Module):
         self.bn2 = nn.BatchNorm2d(out_channels, momentum=momentum)
         self.relu2 = nn.ReLU(inplace=True)
 
-    def forward(self, x_in):
-        x = self.conv1(x_in)
+    def forward(self, x):
+        x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu1(x)
         x = self.conv2(x)

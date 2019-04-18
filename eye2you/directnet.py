@@ -13,26 +13,26 @@ class DirectNet(nn.Module):
 
         self.res_conv1 = Basic2d(in_channels=64, out_channels=64, kernel_size=1, padding=0, relu=False)
 
-        self.sep1 = Basic2d(in_channels=64, out_channels=64, kernel_size=15, padding=7, groups=64)
-        self.sep2 = Basic2d(in_channels=64, out_channels=64, kernel_size=15, padding=7, groups=64, relu=False)
+        self.sep1 = DepthSeparable2d(in_channels=64, out_channels=64, kernel_size=15, padding=7, groups=64)
+        self.sep2 = DepthSeparable2d(in_channels=64, out_channels=64, kernel_size=15, padding=7, groups=64, relu=False)
 
         self.res_conv2 = Basic2d(in_channels=64, out_channels=64, kernel_size=1, padding=0, relu=False)
 
-        self.sep3 = Basic2d(in_channels=64, out_channels=64, kernel_size=15, padding=7, groups=64)
-        self.sep4 = Basic2d(in_channels=64, out_channels=64, kernel_size=15, padding=7, groups=64, relu=False)
+        self.sep3 = DepthSeparable2d(in_channels=64, out_channels=64, kernel_size=15, padding=7, groups=64)
+        self.sep4 = DepthSeparable2d(in_channels=64, out_channels=64, kernel_size=15, padding=7, groups=64, relu=False)
 
         self.res_conv3 = Basic2d(in_channels=64, out_channels=64, kernel_size=1, padding=0, relu=False)
 
-        self.sep5 = Basic2d(in_channels=64, out_channels=64, kernel_size=15, padding=7, groups=64)
-        self.sep6 = Basic2d(in_channels=64, out_channels=64, kernel_size=15, padding=7, groups=64, relu=False)
+        self.sep5 = DepthSeparable2d(in_channels=64, out_channels=64, kernel_size=15, padding=7, groups=64)
+        self.sep6 = DepthSeparable2d(in_channels=64, out_channels=64, kernel_size=15, padding=7, groups=64, relu=False)
 
         self.res_conv4 = Basic2d(in_channels=64, out_channels=64, kernel_size=1, padding=0, relu=False)
 
-        self.sep7 = Basic2d(in_channels=64, out_channels=64, kernel_size=15, padding=7, groups=64)
-        self.sep8 = Basic2d(in_channels=64, out_channels=64, kernel_size=15, padding=7, groups=64, relu=False)
+        self.sep7 = DepthSeparable2d(in_channels=64, out_channels=64, kernel_size=15, padding=7, groups=64)
+        self.sep8 = DepthSeparable2d(in_channels=64, out_channels=64, kernel_size=15, padding=7, groups=64, relu=False)
 
-        self.sep9 = Basic2d(in_channels=64, out_channels=16, kernel_size=7, padding=3, groups=16)
-        self.sep10 = Basic2d(in_channels=16, out_channels=out_channels, kernel_size=5, padding=2, groups=1)
+        self.sep9 = DepthSeparable2d(in_channels=64, out_channels=16, kernel_size=7, padding=3, groups=16)
+        self.sep10 = DepthSeparable2d(in_channels=16, out_channels=out_channels, kernel_size=5, padding=2, groups=1)
 
     def forward(self, x):
         x = self.conv1(x)
@@ -151,7 +151,7 @@ class SpatialSeparable2d(nn.Module):
         x = self.convH(x)
         x = self.convW(x)
         x = self.bn(x)
-        if x.relu is not None:
+        if self.relu is not None:
             x = self.relu(x)
         return x
 
@@ -167,6 +167,7 @@ class DepthSeparable2d(nn.Module):
                  kernel_size=3,
                  padding=1,
                  stride=1,
+                 groups=None,
                  bias=False,
                  momentum=0.1,
                  relu=True):
@@ -178,14 +179,10 @@ class DepthSeparable2d(nn.Module):
             padding=padding,
             stride=stride,
             groups=in_channels,
-            bias=bias,)
+            bias=bias,
+        )
         self.conv_point = nn.Conv2d(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel_size=1,
-            padding=0,
-            stride=stride,
-            bias=bias)
+            in_channels=in_channels, out_channels=out_channels, kernel_size=1, padding=0, stride=stride, bias=bias)
         self.bn = nn.BatchNorm2d(out_channels, momentum=momentum)
         if relu:
             self.relu = nn.ReLU(inplace=True)
@@ -194,8 +191,8 @@ class DepthSeparable2d(nn.Module):
 
     def forward(self, x):
         x = self.conv_depth(x)
-        x = self.conv_pointwise(x)
+        x = self.conv_point(x)
         x = self.bn(x)
-        if x.relu is not None:
+        if self.relu is not None:
             x = self.relu(x)
         return x

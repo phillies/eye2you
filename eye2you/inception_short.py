@@ -255,7 +255,7 @@ class Inception3SPlus(nn.Module):
         self.VesselMultiplier = nn.Conv2d(in_channels=1, out_channels=768, kernel_size=1, bias=False)
         self.VesselMultiplier.weight.data.copy_(torch.ones((768, 1, 1, 1)))
         self.VesselMultiplier.weight.requires_grad = False
-        self.Vessel = BasicConv3d(768, 768, kernel_size=(2, 1, 1))
+        self.Vessel = BasicConv3d(768, 768, kernel_size=(2, 3, 3), padding=(0, 1, 1))
         self.fc = nn.Linear(768, num_classes)
 
         for m in self.modules():

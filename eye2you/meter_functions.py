@@ -287,3 +287,118 @@ def segmentation_all(predictions, targets):
         segmentation_iou(predictions, targets),
         segmentation_dice(predictions, targets)
     ]
+
+
+class PerformanceMeter():
+
+    def update(self, output, target):
+        raise NotImplementedError
+
+    def reset(self):
+        raise NotImplementedError
+
+    def value(self):
+        raise NotImplementedError
+
+    def __repr__(self):
+        '''
+        This should return a string that, when called with eval(), creates the same PerformanceMeter
+        '''
+        raise NotImplementedError
+
+    def __str__(self):
+        '''
+        This will be the function that returns the column name in the logger
+        '''
+        raise NotImplementedError
+
+
+class TotalAccuracyMeter(PerformanceMeter):
+
+    def __init__(self):
+        self.total = 0
+        self.correct = 0
+
+    def update(self, output, target):
+        if isinstance(output, tuple):
+            predicted = nn.Sigmoid()(output[0])
+        else:
+            predicted = nn.Sigmoid()(output)
+        perf = (predicted.round() == target).sum(1) == target.shape[1]
+        num_correct = float(perf.sum())
+        self.correct += num_correct
+        self.total += target.shape[0]
+        return self.value()
+
+    def reset(self):
+        self.total = 0
+        self.correct = 0
+
+    def value(self):
+        if self.total == 0:
+            return 0
+        return self.correct / self.total
+
+    def __repr__(self):
+        return 'TotalAccuracyMeter()'
+
+    def __str__(self):
+        return 'accuracy'
+
+
+class SingleAccuracyMeter(PerformanceMeter):
+
+    def __init__(self, index=0):
+        self.total = 0
+        self.correct = 0
+        self.index = index
+
+    def update(self, output, target):
+        if isinstance(output, tuple):
+            predicted = nn.Sigmoid()(output[0])
+        else:
+            predicted = nn.Sigmoid()(output)
+        perf = (predicted[:, self.index].round() == target[:, self.index])
+        num_correct = float(perf.sum())
+        self.correct += num_correct
+        self.total += target.shape[0]
+        return self.value()
+
+    def reset(self):
+        self.total = 0
+        self.correct = 0
+
+    def value(self):
+        if self.total == 0:
+            return 0
+        return self.correct / self.total
+
+    def __repr__(self):
+        return 'SingleAccuracyMeter(index={})'.format(self.index)
+
+    def __str__(self):
+        return 'accuracy class {}'.format(self.index)
+
+
+class SegmentationMeter(PerformanceMeter):
+
+    def __init__(self):
+        self.results = []
+
+    def update(self, output, target):
+        res = segmentation_all(output, target)
+        self.results.append(res)
+        return self.value()
+
+    def value(self):
+        val = np.array(self.results).sum(0)
+        return val
+
+    def reset(self):
+        self.results = []
+
+    def __repr__(self):
+        return 'SegmentationMeter()'
+
+    def __str__(self):
+        return 'accuracy precicion recall specificity iou dice'

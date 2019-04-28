@@ -2,7 +2,6 @@ import numpy as np
 import torch
 import torchvision
 import cv2
-from .transforms import SlidingWindowCrop
 import tqdm
 from PIL import Image
 

@@ -9,10 +9,10 @@ import torch
 IMG_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tiff']
 
 
-def pil_loader(path):
+def pil_loader(path, mode='RGB'):
     with open(path, 'rb') as f:
         img = Image.open(f)
-        return img.convert('RGB')
+        return img.convert(mode)
 
 
 def make_dataset(directory, class_to_idx, extensions):

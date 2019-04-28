@@ -8,12 +8,147 @@ import sklearn.model_selection
 import torch
 import torch.utils.data
 import torchvision
+import torchvision.transforms as transforms
 import torchvision.transforms.functional as F
 from PIL import Image
 
-from .io_helper import IMG_EXTENSIONS, find_classes, make_dataset, pil_loader
 from .image_helper import parallel_variance
+from .io_helper import IMG_EXTENSIONS, find_classes, make_dataset, pil_loader
 
+
+class TripleDataset(torch.utils.data.Dataset):
+
+    def __init__(self,
+                 samples=None,
+                 segmentations=None,
+                 masks=None,
+                 targets=None,
+                 target_labels=None,
+                 rotation=None,
+                 random_resize_crop=None,
+                 color_jitter=None,
+                 transform=transforms.ToTensor(),
+                 target_transform=None,
+                 mean=(0.0, 0.0, 0.0),
+                 std=(1.0, 1.0, 1.0),
+                 loader=pil_loader,
+                 **kwargs):
+
+        super().__init__(**kwargs)
+        self.samples = samples
+        self.segmentations = segmentations
+        self.masks = masks
+        self.targets = targets
+        self.target_labels = target_labels
+
+        self.rotation = rotation
+        self.random_resize_crop = random_resize_crop
+        self.color_jitter = color_jitter
+        self.transform = transform
+        self.target_transform = target_transform
+
+        self.mean = mean
+        self.std = std
+
+        self.loader = loader
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, index):
+        if index < 0 or index >= self.__len__():
+            raise IndexError('Index {0} our of bounds for dataset of length {1}'.format(index, len(self)))
+
+        # get all frames for index
+        sample = self.loader(self.samples[index])
+        if self.masks is None:
+            mask = Image.fromarray(np.ones((sample.height, sample.width), dtype=np.uint8) * 255)
+        else:
+            mask = self.loader(self.masks[index]).convert('L')
+        if self.segmentations is None:
+            segment = Image.fromarray(np.zeros((sample.height, sample.width), dtype=np.uint8))
+        else:
+            segment = self.loader(self.segmentations[index]).convert('L')
+        target = self.targets[index]
+
+        # special treatment if target is class labels vs. filename
+        if isinstance(target, str):
+            target = self.loader(target).convert('L')
+            target_is_image = True
+        else:
+            target_is_image = False
+
+        if self.color_jitter is not None:
+            trans = self.color_jitter.get_params(self.color_jitter.brightness, self.color_jitter.saturation, self.color_jitter.contrast, self.color_jitter.hue)
+            sample = trans(sample)
+
+        # apply rotation
+        if self.rotation is not None:
+            angle = self.rotation.get_params(self.rotation.degrees)
+            sample = F.rotate(sample, angle, Image.BILINEAR, self.rotation.expand, self.rotation.center)
+            mask = F.rotate(mask, angle, Image.NEAREST, self.rotation.expand, self.rotation.center)
+            segment = F.rotate(segment, angle, Image.NEAREST, self.rotation.expand, self.rotation.center)
+            if target_is_image:
+                target = F.rotate(target, angle, Image.NEAREST, self.rotation.expand, self.rotation.center)
+
+        # apply RRC
+        if self.random_resize_crop is not None:
+            i, j, h, w = self.random_resize_crop.get_params(sample, self.random_resize_crop.scale,
+                                                            self.random_resize_crop.ratio)
+            sample = F.resized_crop(sample, i, j, h, w, self.random_resize_crop.size, Image.BILINEAR)
+            mask = F.resized_crop(mask, i, j, h, w, self.random_resize_crop.size, Image.NEAREST)
+            segment = F.resized_crop(segment, i, j, h, w, self.random_resize_crop.size, Image.NEAREST)
+            if target_is_image:
+                target = F.resized_crop(target, i, j, h, w, self.random_resize_crop.size, Image.NEAREST)
+
+        # apply (target) transform
+        if self.transform is not None:
+            sample = self.transform(sample)
+            mask = self.transform(mask)
+            segment = self.transform(segment)
+            if target_is_image:
+                target = self.transform(target)
+
+        if self.target_transform is not None and not target_is_image:
+            target = self.target_transform(target)
+
+        # apply normalization
+        transforms.functional.normalize(sample, self.mean, self.std, inplace=True)
+
+        return (sample, mask, segment), target
+
+    def read_csv(self, filename, root=''):
+        df = pd.read_csv(filename, index_col=0)
+        self.samples = [os.path.join(root, v) for v in df.index.values]
+        if 'mask' in df:
+            self.masks = [os.path.join(root, v) for v in df['mask'].values]
+        if 'segmentation' in df:
+            self.segmentations = [os.path.join(root, v) for v in df['segmentation'].values]
+
+        cols = df.columns.drop(['mask', 'segmentation'], errors='ignore')
+        if cols.size == 1 and isinstance(df[cols].iloc[0], str):
+            self.targets = [os.path.join(root, v) for v in df[cols].values]
+            self.target_labels = cols
+        else:
+            self.targets = df[cols].values
+            self.target_labels = cols
+        return self
+
+    def to_csv(self, filename):
+        #TODO: implement export
+        pass
+    
+    def __str__(self):
+        res = ''
+        res += str(self.samples) + '\n'
+        res += str(self.masks) + '\n'
+        res += str(self.segmentations) + '\n'
+        res += str(self.targets) + '\n'
+        return res
+
+    @property
+    def size(self):
+        return len(self)
 
 class PandasDataset(torch.utils.data.Dataset):
     """[summary]
@@ -101,39 +236,38 @@ class PandasDataset(torch.utils.data.Dataset):
             return_indices {list} -- List where the indices of the split will be appended. (default: {None})
         """
 
-        sss = sklearn.model_selection.StratifiedShuffleSplit(
-            n_splits=1, test_size=test_size, train_size=train_size, random_state=random_state)
+        sss = sklearn.model_selection.StratifiedShuffleSplit(n_splits=1,
+                                                             test_size=test_size,
+                                                             train_size=train_size,
+                                                             random_state=random_state)
         train_index, test_index = next(iter(sss.split(self.filenames, self.targets)))
-        train_set = PandasDataset(
-            source=self.samples.iloc[train_index],
-            root=self.root,
-            mode='pandas',
-            loader=self.loader,
-            extensions=self.extensions,
-            transform=self.transform,
-            target_transform=self.target_transform)
-        test_set = PandasDataset(
-            source=self.samples.iloc[test_index],
-            root=self.root,
-            mode='pandas',
-            loader=self.loader,
-            extensions=self.extensions,
-            transform=self.transform,
-            target_transform=self.target_transform)
+        train_set = PandasDataset(source=self.samples.iloc[train_index],
+                                  root=self.root,
+                                  mode='pandas',
+                                  loader=self.loader,
+                                  extensions=self.extensions,
+                                  transform=self.transform,
+                                  target_transform=self.target_transform)
+        test_set = PandasDataset(source=self.samples.iloc[test_index],
+                                 root=self.root,
+                                 mode='pandas',
+                                 loader=self.loader,
+                                 extensions=self.extensions,
+                                 transform=self.transform,
+                                 target_transform=self.target_transform)
         if return_indices is not None and isinstance(return_indices, list):
             return_indices.append(train_index)
             return_indices.append(test_index)
         return train_set, test_set
 
     def clone(self):
-        data = PandasDataset(
-            source=self.samples.copy(deep=True),
-            root=self.root,
-            mode='pandas',
-            loader=self.loader,
-            extensions=self.extensions,
-            transform=self.transform,
-            target_transform=self.target_transform)
+        data = PandasDataset(source=self.samples.copy(deep=True),
+                             root=self.root,
+                             mode='pandas',
+                             loader=self.loader,
+                             extensions=self.extensions,
+                             transform=self.transform,
+                             target_transform=self.target_transform)
         return data
 
     def join(self, other, align_root=False):
@@ -191,14 +325,13 @@ class PandasDataset(torch.utils.data.Dataset):
         self.filenames = self.samples.index.values
 
     def subset(self, indices):
-        data = PandasDataset(
-            source=self.samples.iloc[indices].copy(deep=True),
-            root=self.root,
-            mode='pandas',
-            loader=self.loader,
-            extensions=self.extensions,
-            transform=self.transform,
-            target_transform=self.target_transform)
+        data = PandasDataset(source=self.samples.iloc[indices].copy(deep=True),
+                             root=self.root,
+                             mode='pandas',
+                             loader=self.loader,
+                             extensions=self.extensions,
+                             transform=self.transform,
+                             target_transform=self.target_transform)
         return data
 
     def dump(self, filename):
@@ -258,14 +391,13 @@ class PandasDataset(torch.utils.data.Dataset):
         data = self.samples.copy(deep=True)
         data = data.append(other.samples)
 
-        dataset = PandasDataset(
-            source=data,
-            root=self.root,
-            mode='pandas',
-            loader=self.loader,
-            extensions=self.extensions,
-            transform=self.transform,
-            target_transform=self.target_transform)
+        dataset = PandasDataset(source=data,
+                                root=self.root,
+                                mode='pandas',
+                                loader=self.loader,
+                                extensions=self.extensions,
+                                transform=self.transform,
+                                target_transform=self.target_transform)
         return dataset
 
 
@@ -451,8 +583,10 @@ class SegmentationDatasetWithSampler(SegmentationDataset):
                          ratio=(3. / 4., 4. / 3.),
                          interpolation=Image.BILINEAR,
                          normalize=False):
-        self.random_resized_crop = torchvision.transforms.RandomResizedCrop(
-            size=size, scale=scale, ratio=ratio, interpolation=interpolation)
+        self.random_resize_crop = torchvision.transforms.RandomResizedCrop(size=size,
+                                                                           scale=scale,
+                                                                           ratio=ratio,
+                                                                           interpolation=interpolation)
         self.rotation = torchvision.transforms.RandomRotation(180)
         self.normalize = normalize
 
@@ -471,11 +605,10 @@ class SegmentationDatasetWithSampler(SegmentationDataset):
         sample = F.rotate(sample, angle, Image.BILINEAR, self.rotation.expand, self.rotation.center)
         target = F.rotate(target, angle, Image.NEAREST, self.rotation.expand, self.rotation.center)
 
-        i, j, h, w = self.random_resized_crop.get_params(sample, self.random_resized_crop.scale,
-                                                         self.random_resized_crop.ratio)
-        sample = F.resized_crop(sample, i, j, h, w, self.random_resized_crop.size,
-                                self.random_resized_crop.interpolation)
-        target = F.resized_crop(target, i, j, h, w, self.random_resized_crop.size, Image.NEAREST)
+        i, j, h, w = self.random_resize_crop.get_params(sample, self.random_resize_crop.scale,
+                                                        self.random_resize_crop.ratio)
+        sample = F.resized_crop(sample, i, j, h, w, self.random_resize_crop.size, self.random_resize_crop.interpolation)
+        target = F.resized_crop(target, i, j, h, w, self.random_resize_crop.size, Image.NEAREST)
 
         sample = self.transform(sample)
         target = self.target_transform(target)
@@ -492,11 +625,10 @@ class SegmentationDatasetWithSampler(SegmentationDataset):
         return sample, target
 
     def resize_crop_entries(self, sample, target):
-        i, j, h, w = self.random_resized_crop.get_params(sample, self.random_resized_crop.scale,
-                                                         self.random_resized_crop.ratio)
-        sample = F.resized_crop(sample, i, j, h, w, self.random_resized_crop.size,
-                                self.random_resized_crop.interpolation)
-        target = F.resized_crop(target, i, j, h, w, self.random_resized_crop.size, Image.NEAREST)
+        i, j, h, w = self.random_resize_crop.get_params(sample, self.random_resize_crop.scale,
+                                                        self.random_resize_crop.ratio)
+        sample = F.resized_crop(sample, i, j, h, w, self.random_resize_crop.size, self.random_resize_crop.interpolation)
+        target = F.resized_crop(target, i, j, h, w, self.random_resize_crop.size, Image.NEAREST)
         return sample, target
 
     def preload(self):
@@ -530,7 +662,7 @@ class VesselDataset(torch.utils.data.Dataset):
         self.normalize = None
 
         self.rotation = None
-        self.random_resized_crop = None
+        self.random_resize_crop = None
 
     def __len__(self):
         return len(self.samples)
@@ -544,7 +676,7 @@ class VesselDataset(torch.utils.data.Dataset):
         return self
 
     def set_transforms(self, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.), angle=180):
-        self.random_resized_crop = torchvision.transforms.RandomResizedCrop(size=size, scale=scale, ratio=ratio)
+        self.random_resize_crop = torchvision.transforms.RandomResizedCrop(size=size, scale=scale, ratio=ratio)
         self.rotation = torchvision.transforms.RandomRotation(angle)
         self.normalize = torchvision.transforms.Normalize(self.mean, self.std)
         return self
@@ -562,11 +694,11 @@ class VesselDataset(torch.utils.data.Dataset):
             sample = F.rotate(sample, angle, Image.BILINEAR, self.rotation.expand, self.rotation.center)
             segment = F.rotate(segment, angle, Image.NEAREST, self.rotation.expand, self.rotation.center)
 
-        if self.random_resized_crop is not None:
-            i, j, h, w = self.random_resized_crop.get_params(sample, self.random_resized_crop.scale,
-                                                            self.random_resized_crop.ratio)
-            sample = F.resized_crop(sample, i, j, h, w, self.random_resized_crop.size, Image.BILINEAR)
-            segment = F.resized_crop(segment, i, j, h, w, self.random_resized_crop.size, Image.NEAREST)
+        if self.random_resize_crop is not None:
+            i, j, h, w = self.random_resize_crop.get_params(sample, self.random_resize_crop.scale,
+                                                            self.random_resize_crop.ratio)
+            sample = F.resized_crop(sample, i, j, h, w, self.random_resize_crop.size, Image.BILINEAR)
+            segment = F.resized_crop(segment, i, j, h, w, self.random_resize_crop.size, Image.NEAREST)
 
         if self.transform is not None:
             sample = self.transform(sample)

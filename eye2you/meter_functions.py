@@ -377,7 +377,7 @@ class SingleAccuracyMeter(PerformanceMeter):
         return 'SingleAccuracyMeter(index={})'.format(self.index)
 
     def __str__(self):
-        return 'accuracy class {}'.format(self.index)
+        return 'accuracy_class_{}'.format(self.index)
 
 
 class SegmentationMeter(PerformanceMeter):
@@ -391,7 +391,7 @@ class SegmentationMeter(PerformanceMeter):
         return self.value()
 
     def value(self):
-        val = np.array(self.results).sum(0)
+        val = np.concatenate(self.results, axis=1).mean(1)
         return val
 
     def reset(self):
@@ -401,4 +401,144 @@ class SegmentationMeter(PerformanceMeter):
         return 'SegmentationMeter()'
 
     def __str__(self):
-        return 'accuracy precicion recall specificity iou dice'
+        return ('accuracy', 'precicion', 'recall', 'specificity', 'iou', 'dice')
+
+
+class SegmentationAccuracyMeter(PerformanceMeter):
+
+    def __init__(self):
+        self.results = []
+
+    def update(self, output, target):
+        res = segmentation_accuracy(output, target)
+        self.results.append(res)
+        return self.value()
+
+    def value(self):
+        val = np.array(self.results).mean()
+        return val
+
+    def reset(self):
+        self.results = []
+
+    def __repr__(self):
+        return 'SegmentationAccuracyMeter()'
+
+    def __str__(self):
+        return 'accuracy'
+
+
+class SegmentationPrecisionMeter(PerformanceMeter):
+
+    def __init__(self):
+        self.results = []
+
+    def update(self, output, target):
+        res = segmentation_recall(output, target)
+        self.results.append(res)
+        return self.value()
+
+    def value(self):
+        val = np.array(self.results).mean()
+        return val
+
+    def reset(self):
+        self.results = []
+
+    def __repr__(self):
+        return 'SegmentationPrecisionMeter()'
+
+    def __str__(self):
+        return 'precision'
+
+class SegmentationRecallMeter(PerformanceMeter):
+
+    def __init__(self):
+        self.results = []
+
+    def update(self, output, target):
+        res = segmentation_recall(output, target)
+        self.results.append(res)
+        return self.value()
+
+    def value(self):
+        val = np.array(self.results).mean()
+        return val
+
+    def reset(self):
+        self.results = []
+
+    def __repr__(self):
+        return 'SegmentationRecallMeter()'
+
+    def __str__(self):
+        return 'recall'
+
+class SegmentationSpecificityMeter(PerformanceMeter):
+
+    def __init__(self):
+        self.results = []
+
+    def update(self, output, target):
+        res = segmentation_specificity(output, target)
+        self.results.append(res)
+        return self.value()
+
+    def value(self):
+        val = np.array(self.results).mean()
+        return val
+
+    def reset(self):
+        self.results = []
+
+    def __repr__(self):
+        return 'SegmentationSpecificityMeter()'
+
+    def __str__(self):
+        return 'specificity'
+
+class SegmentationIOUMeter(PerformanceMeter):
+
+    def __init__(self):
+        self.results = []
+
+    def update(self, output, target):
+        res = segmentation_iou(output, target)
+        self.results.append(res)
+        return self.value()
+
+    def value(self):
+        val = np.array(self.results).mean()
+        return val
+
+    def reset(self):
+        self.results = []
+
+    def __repr__(self):
+        return 'SegmentationIOUMeter()'
+
+    def __str__(self):
+        return 'iou'
+
+class SegmentationDiceMeter(PerformanceMeter):
+
+    def __init__(self):
+        self.results = []
+
+    def update(self, output, target):
+        res = segmentation_dice(output, target)
+        self.results.append(res)
+        return self.value()
+
+    def value(self):
+        val = np.array(self.results).mean()
+        return val
+
+    def reset(self):
+        self.results = []
+
+    def __repr__(self):
+        return 'SegmentationDiceMeter()'
+
+    def __str__(self):
+        return 'dice'

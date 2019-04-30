@@ -230,10 +230,11 @@ class Coach():
             early_stop_criterion=None,
             early_stop_slope=0.0):
         #TODO: add error message if model is not set up completely
-        pbar = tqdm.tqdm(total=num_epochs, desc='Epoch')
+        pbar = tqdm.tqdm(total=num_epochs, desc='Epoch', position=0)
         for _ in range(num_epochs):
-            train_results = self.net.train(self.train_loader)
-            validate_results = self.net.validate(self.validate_loader)
+            train_results = self.net.train(self.train_loader, position=1)
+            validate_results = self.net.validate(self.validate_loader, position=1)
+            pbar.write('Test: {}\tvalidate: {}'.format(train_results[0], validate_results[0]))
 
             self.log.append(train_results, 'training')
             self.log.append(validate_results, 'validation')
@@ -241,7 +242,7 @@ class Coach():
                 self.log.to_csv(log_filename)
             if checkpoint is not None:
                 #TODO: select max/min by criterion
-                idxmax, idxmin = self.log.idxmax('validation')
+                idxmax, idxmin = self.log.idxmaxmin('validation')
                 for ii, idx in enumerate(idxmax[1:]):
                     if idx == self.epochs:
                         self.save(checkpoint + '.' + idxmax.index[ii] + '.ckpt')
@@ -251,7 +252,7 @@ class Coach():
             if early_stop_window is not None and early_stop_window >= self.epochs:
                 validation_slope = self.log.get_slope('validation', early_stop_criterion, early_stop_window)
                 if validation_slope < early_stop_slope:
-                    print('\n\nEarly stop triggered. Slope {}'.format(validation_slope))
+                    pbar.write('Early stop triggered. Slope {}'.format(validation_slope))
                     return
             self.epochs += 1
             pbar.update(1)

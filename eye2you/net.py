@@ -107,7 +107,7 @@ class Network():
         if use_scheduler:
             self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, **scheduler_kwargs)
 
-    def train(self, loader):
+    def train(self, loader, position=None):
         if self.optimizer is None:
             raise ValueError('No optimizer defined. Cannot run training.')
         self.model.train()
@@ -115,13 +115,13 @@ class Network():
             self.scheduler.step()
 
         total_loss = 0
-        num_samples = len(loader.dataset)
         num_batches = len(loader)
+        num_samples = num_batches * loader.batch_size  #due to drop_last it's not len(loader.dataset)
 
         for perf_meter in self.performance_meters:
             perf_meter.reset()
 
-        pbar = tqdm.tqdm(total=num_batches, leave=False, desc='Train')
+        pbar = tqdm.tqdm(total=num_batches, leave=False, desc='Train', position=position)
         for source, target in loader:
             if isinstance(source, (tuple, list)):
                 source = [v.to(self.device) for v in source]
@@ -137,7 +137,7 @@ class Network():
                     loss = sum((self.criterion(o, target) for o in outputs)) / len(outputs)
                 else:
                     loss = self.criterion(outputs, target)
-                total_loss += loss.item()
+                total_loss += loss.item() * target.shape[0]
             for perf_meter in self.performance_meters:
                 if isinstance(outputs, tuple):
                     perf_meter.update(outputs[0], target)
@@ -150,9 +150,9 @@ class Network():
 
             pbar.update(1)
 
-        return (total_loss / num_batches, *[p.value() for p in self.performance_meters])
+        return (total_loss / num_samples, *[p.value() for p in self.performance_meters])
 
-    def validate(self, loader):
+    def validate(self, loader, position=None):
         self.model.eval()
 
         total_loss = 0
@@ -163,7 +163,7 @@ class Network():
             perf_meter.reset()
 
         with torch.no_grad():
-            pbar = tqdm.tqdm(total=num_batches, leave=False, desc='Validate')
+            pbar = tqdm.tqdm(total=num_batches, leave=False, desc='Validate', position=position)
             for source, target in loader:
                 if isinstance(source, (tuple, list)):
                     source = [v.to(self.device) for v in source]
@@ -175,13 +175,13 @@ class Network():
 
                 if self.criterion is not None:
                     loss = self.criterion(output, target)
-                    total_loss += loss.item()
+                    total_loss += loss.item() * target.shape[0]
                 for perf_meter in self.performance_meters:
                     perf_meter.update(output, target)
 
                 pbar.update(1)
 
-        return (total_loss / num_batches, *[p.value() for p in self.performance_meters])
+        return (total_loss / num_samples, *[p.value() for p in self.performance_meters])
 
     def load_state_dict(self, checkpoint):
         self.model.load_state_dict(checkpoint['model'])

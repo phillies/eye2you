@@ -249,7 +249,7 @@ class Coach():
                 if idxmin[0] == self.epochs:
                     self.save(checkpoint + '.' + idxmax.index[0] + '.ckpt')
 
-            if early_stop_window is not None and early_stop_window >= self.epochs:
+            if early_stop_window is not None and self.epochs >= early_stop_window:
                 validation_slope = self.log.get_slope('validation', early_stop_criterion, early_stop_window)
                 if validation_slope < early_stop_slope:
                     pbar.write('Early stop triggered. Slope {}'.format(validation_slope))

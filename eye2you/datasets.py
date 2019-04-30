@@ -79,7 +79,7 @@ class TripleDataset(torch.utils.data.Dataset):
             target_is_image = False
 
         if self.color_jitter is not None:
-            trans = self.color_jitter.get_params(self.color_jitter.brightness, self.color_jitter.saturation, self.color_jitter.contrast, self.color_jitter.hue)
+            trans = self.color_jitter.get_params(self.color_jitter.brightness,  self.color_jitter.contrast, self.color_jitter.saturation, self.color_jitter.hue)
             sample = trans(sample)
 
         # apply rotation
@@ -137,7 +137,7 @@ class TripleDataset(torch.utils.data.Dataset):
     def to_csv(self, filename):
         #TODO: implement export
         pass
-    
+
     def __str__(self):
         res = ''
         res += str(self.samples) + '\n'

@@ -26,6 +26,25 @@ def network_from_dict(config):
     return net
 
 
+def config_from_yaml(filename):
+    with open(filename, 'r') as f:
+        config = yaml.load(f, Loader=yaml.SafeLoader)
+
+    # TODO: find better solution than eval()
+    if 'performance_meters' in config['net'] and config['net']['performance_meters'] is not None:
+        config['net']['performance_meters'] = [eval(m) for m in config['net']['performance_meters']]
+    if 'transform' in config['training'] and config['training']['transform'] is not None:
+        config['training']['transform'] = eval(config['training']['transform'])
+    if 'target_transform' in config['training'] and config['training']['target_transform'] is not None:
+        config['training']['target_transform'] = eval(config['training']['target_transform'])
+    if 'transform' in config['validation'] and config['validation']['transform'] is not None:
+        config['validation']['transform'] = eval(config['validation']['transform'])
+    if 'target_transform' in config['training'] and config['validation']['target_transform'] is not None:
+        config['validation']['target_transform'] = eval(config['validation']['target_transform'])
+
+    return config
+
+
 def coach_from_yaml(filename):
     with open(filename, 'r') as f:
         config = yaml.load(f, Loader=yaml.SafeLoader)

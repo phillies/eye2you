@@ -134,10 +134,11 @@ class Network():
             if self.criterion is not None:
                 if isinstance(outputs, tuple):
                     #TODO: Check if the division by length of outputs make a notable difference
-                    loss = sum((self.criterion(o, target) for o in outputs)) / len(outputs)
+                    loss = sum((self.criterion(o, target) for o in outputs))
+                    total_loss += loss.item() * target.shape[0] / len(outputs)
                 else:
                     loss = self.criterion(outputs, target)
-                total_loss += loss.item() * target.shape[0]
+                    total_loss += loss.item() * target.shape[0]
             for perf_meter in self.performance_meters:
                 if isinstance(outputs, tuple):
                     perf_meter.update(outputs[0], target)
@@ -211,3 +212,13 @@ class Network():
         names = ['loss']
         names += [str(p) for p in self.performance_meters]
         return names
+
+    def __str__(self):
+        res = ''
+        sep = '\n'
+        res = res + self.model_name + str(self.model) + sep
+        res = res + self.criterion_name + sep + str(self.criterion) + sep
+        res = res + self.optimizer_name + sep + str(self.optimizer) + sep
+        res = res + str(self.performance_meters) + sep
+        res = res + str(self.scheduler)
+        return res

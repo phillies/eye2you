@@ -144,6 +144,13 @@ class TripleDataset(torch.utils.data.Dataset):
         res += str(self.masks) + '\n'
         res += str(self.segmentations) + '\n'
         res += str(self.targets) + '\n'
+        res += str(self.target_labels) + '\n'
+        res += str(self.rotation) + '\n'
+        res += str(self.random_resize_crop) + '\n'
+        res += str(self.color_jitter) + '\n'
+        res += str(self.transform) + '\n'
+        res += str(self.target_transform) + '\n'
+        res += str(self.mean) + ' ' + str(self.std)
         return res
 
     @property

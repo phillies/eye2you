@@ -17,6 +17,11 @@ def all_or_nothing_performance(labels, outputs):
         predicted = nn.Sigmoid()(outputs[0])
     else:
         predicted = nn.Sigmoid()(outputs)
+    print('#######in#######')
+    print(outputs)
+    print(predicted.round())
+    print(labels)
+    print('########out######')
     perf = (predicted.round() == labels).sum(1) == labels.size()[1]
     num_correct = float(perf.sum())
     return num_correct
@@ -451,6 +456,7 @@ class SegmentationPrecisionMeter(PerformanceMeter):
     def __str__(self):
         return 'precision'
 
+
 class SegmentationRecallMeter(PerformanceMeter):
 
     def __init__(self):
@@ -473,6 +479,7 @@ class SegmentationRecallMeter(PerformanceMeter):
 
     def __str__(self):
         return 'recall'
+
 
 class SegmentationSpecificityMeter(PerformanceMeter):
 
@@ -497,6 +504,7 @@ class SegmentationSpecificityMeter(PerformanceMeter):
     def __str__(self):
         return 'specificity'
 
+
 class SegmentationIOUMeter(PerformanceMeter):
 
     def __init__(self):
@@ -519,6 +527,7 @@ class SegmentationIOUMeter(PerformanceMeter):
 
     def __str__(self):
         return 'iou'
+
 
 class SegmentationDiceMeter(PerformanceMeter):
 

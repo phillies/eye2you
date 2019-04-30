@@ -53,6 +53,13 @@ class Logger():
                                        np.array(series).reshape(-1, 1)).coef_[0, 0]
         return slope
 
+    def get_best(self, category, criterion, min_or_max='max'):
+        if min_or_max == 'max':
+            idx = self._log[category][criterion].idxmax(axis='index', skipna=True)
+        else:
+            idx = self._log[category][criterion].idxmin(axis='index', skipna=True)
+        return idx, self._log[category].iloc[idx]
+
 
 class Coach():
 
@@ -227,17 +234,29 @@ class Coach():
             log_filename=None,
             checkpoint=None,
             early_stop_window=None,
-            early_stop_criterion=None,
+            early_stop_criterion='loss',
             early_stop_slope=0.0):
         #TODO: add error message if model is not set up completely
         pbar = tqdm.tqdm(total=num_epochs, desc='Epoch', position=0)
+        log_train = tqdm.tqdm(total=0, desc='Training results', position=2, bar_format='{desc}')
+        log_val = tqdm.tqdm(total=0, desc='Validation results', position=3, bar_format='{desc}')
+        log_best = tqdm.tqdm(total=0, desc='Validation best', position=4, bar_format='{desc}')
+        log_slope = tqdm.tqdm(total=0, desc='Validation slope', position=5, bar_format='{desc}')
         for _ in range(num_epochs):
             train_results = self.net.train(self.train_loader, position=1)
             validate_results = self.net.validate(self.validate_loader, position=1)
-            pbar.write('Test: {}\tvalidate: {}'.format(train_results[0], validate_results[0]))
 
             self.log.append(train_results, 'training')
             self.log.append(validate_results, 'validation')
+
+            best_idx, best_results = self.log.get_best('validation', early_stop_criterion)
+            log_train.set_description_str(
+                ('Training results:  ' + ' {:.4f}' * len(train_results)).format(*train_results))
+            log_val.set_description_str(
+                ('Validation results:' + ' {:.4f}' * len(validate_results)).format(*validate_results))
+            log_best.set_description_str(
+                ('Best after {:7d}:' + ' {:.4f}' * len(best_results)).format(best_idx, *best_results))
+
             if log_filename is not None:
                 self.log.to_csv(log_filename)
             if checkpoint is not None:
@@ -249,9 +268,10 @@ class Coach():
                 if idxmin[0] == self.epochs:
                     self.save(checkpoint + '.' + idxmax.index[0] + '.ckpt')
 
-            if early_stop_window is not None and self.epochs >= early_stop_window:
+            if early_stop_window is not None:
                 validation_slope = self.log.get_slope('validation', early_stop_criterion, early_stop_window)
-                if validation_slope < early_stop_slope:
+                log_slope.set_description_str('Validation slope:  {:.4f}'.format(validation_slope))
+                if validation_slope < early_stop_slope and self.epochs >= early_stop_window:
                     pbar.write('Early stop triggered. Slope {}'.format(validation_slope))
                     return
             self.epochs += 1

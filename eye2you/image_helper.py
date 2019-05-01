@@ -4,6 +4,7 @@ import torchvision
 import cv2
 import tqdm
 from PIL import Image
+import imageio
 
 
 def float_to_uint8(img, min_val=None, max_val=None):
@@ -245,6 +246,22 @@ def parallel_variance(mean_a, count_a, var_a, mean_b, count_b, var_b):
     m_b = var_b * (count_b - 1)
     M2 = m_a + m_b + delta**2 * count_a * count_b / (count_a + count_b)
     return M2 / (count_a + count_b - 1)
+
+def calculate_mean_and_std(samples):
+    img = imageio.imread(samples[0])/255.
+    mean_a = img.reshape(-1, 3).mean(0)
+    var_a = img.reshape(-1, 3).var(0)
+    count_a = img.shape[0] * img.shape[1]
+    for s in tqdm.tqdm(samples[1:]):
+        img = imageio.imread(s)/255.
+        mean_b = img.reshape(-1, 3).mean(0)
+        var_b = img.reshape(-1, 3).var(0)
+        count_b = img.shape[0] * img.shape[1]
+        
+        var_a = parallel_variance(mean_a, count_a, var_a, mean_b, count_b, var_b)
+        mean_a = (mean_a * count_a + mean_b * count_b) / (count_a + count_b)
+        count_a += count_b
+    return mean_a, np.sqrt(var_a)
 
 
 def show_samples_from_loader(loader, steps=0):

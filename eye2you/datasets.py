@@ -16,6 +16,134 @@ from .image_helper import parallel_variance
 from .io_helper import IMG_EXTENSIONS, find_classes, make_dataset, pil_loader
 
 
+class DataAugmentation():
+
+    def __init__(self,
+                 angle=None,
+                 size=None,
+                 scale=None,
+                 ratio=None,
+                 brightness=None,
+                 contrast=None,
+                 saturation=None,
+                 hue=None):
+        self.color_jitter = None
+        self.rotation = None
+        self.random_resize_crop = None
+
+        if angle is not None:
+            self.rotation = transforms.RandomRotation(angle)
+        if size is not None:
+            if scale is None:
+                scale = [1, 1]
+            if ratio is None:
+                ratio = [1, 1]
+            self.random_resize_crop = transforms.RandomResizedCrop(size=size, scale=scale, ratio=ratio)
+        if any((brightness, contrast, saturation, hue)):
+            if brightness is None:
+                brightness = 0
+            if contrast is None:
+                contrast = 0
+            if saturation is None:
+                saturation = 0
+            if hue is None:
+                hue = 0
+            self.color_jitter = transforms.ColorJitter(brightness=brightness,
+                                                       contrast=contrast,
+                                                       saturation=saturation,
+                                                       hue=hue)
+
+    def apply(self, source, target):
+        target_is_image = isinstance(target[0], Image.Image)
+        sample, mask, segment = source
+
+        if self.color_jitter is not None:
+            trans = self.color_jitter.get_params(self.color_jitter.brightness, self.color_jitter.contrast,
+                                                 self.color_jitter.saturation, self.color_jitter.hue)
+            sample = trans(sample)
+
+        # apply rotation
+        if self.rotation is not None:
+            angle = self.rotation.get_params(self.rotation.degrees)
+            sample = F.rotate(sample, angle, Image.BILINEAR, self.rotation.expand, self.rotation.center)
+            mask = F.rotate(mask, angle, Image.NEAREST, self.rotation.expand, self.rotation.center)
+            segment = F.rotate(segment, angle, Image.NEAREST, self.rotation.expand, self.rotation.center)
+            if target_is_image:
+                target = F.rotate(target, angle, Image.NEAREST, self.rotation.expand, self.rotation.center)
+
+        # apply RRC
+        if self.random_resize_crop is not None:
+            i, j, h, w = self.random_resize_crop.get_params(sample, self.random_resize_crop.scale,
+                                                            self.random_resize_crop.ratio)
+            sample = F.resized_crop(sample, i, j, h, w, self.random_resize_crop.size, Image.BILINEAR)
+            mask = F.resized_crop(mask, i, j, h, w, self.random_resize_crop.size, Image.NEAREST)
+            segment = F.resized_crop(segment, i, j, h, w, self.random_resize_crop.size, Image.NEAREST)
+            if target_is_image:
+                target = F.resized_crop(target, i, j, h, w, self.random_resize_crop.size, Image.NEAREST)
+
+        return (sample, mask, segment), target
+
+    def __str__(self):
+        trans = []
+        if self.color_jitter is not None:
+            trans.append(self.color_jitter)
+        if self.rotation is not None:
+            trans.append(self.rotation)
+        if self.random_resize_crop is not None:
+            trans.append(self.random_resize_crop)
+        return 'Augmentation:\n' + str(transforms.Compose(trans))
+
+
+class DataPreparation():
+
+    def __init__(self, size=None, mean=None, std=None, crop=None):
+        self.mean = mean
+        self.std = std
+        self.size = size
+        self.crop = crop
+        self.transform = transforms.ToTensor()
+
+    def apply(self, source, target):
+        sample, mask, segment = source
+        target_is_image = isinstance(target[0], Image.Image)
+
+        if self.size is not None:
+            sample = F.resize(sample, self.size, interpolation=Image.BILINEAR)
+            mask = F.resize(mask, self.size, interpolation=Image.NEAREST)
+            segment = F.resize(segment, self.size, interpolation=Image.NEAREST)
+            if target_is_image:
+                target = F.resize(target, self.size, interpolation=Image.NEAREST)
+
+        if self.crop is not None:
+            sample = F.center_crop(sample, self.size)
+            mask = F.center_crop(mask, self.size)
+            segment = F.center_crop(segment, self.size)
+            if target_is_image:
+                target = F.center_crop(target, self.size)
+
+        sample = self.transform(sample)
+        mask = self.transform(mask)
+        segment = self.transform(segment)
+        if target_is_image:
+            target = self.transform(target)
+
+        if self.mean is not None and self.std is not None:
+            sample = transforms.functional.normalize(sample, self.mean, self.std)
+
+        return (sample, mask, segment), target
+
+    def __str__(self):
+        trans = []
+        if self.size is not None:
+            trans.append(transforms.Resize(self.size))
+        if self.crop is not None:
+            trans.append(transforms.CenterCrop(self.crop))
+        trans.append(self.transform)
+        if self.mean is not None and self.std is not None:
+            trans.append(transforms.Normalize(self.mean, self.std))
+        return 'Preparation:\n' + str(transforms.Compose(trans))
+
+
 class TripleDataset(torch.utils.data.Dataset):
 
     def __init__(self,
@@ -24,33 +152,21 @@ class TripleDataset(torch.utils.data.Dataset):
                  masks=None,
                  targets=None,
                  target_labels=None,
-                 rotation=None,
-                 random_resize_crop=None,
-                 color_jitter=None,
-                 transform=transforms.ToTensor(),
-                 target_transform=None,
-                 mean=(0.0, 0.0, 0.0),
-                 std=(1.0, 1.0, 1.0),
                  loader=pil_loader,
-                 **kwargs):
+                 augmentation=None,
+                 preparation=None):
 
-        super().__init__(**kwargs)
+        super().__init__()
         self.samples = samples
         self.segmentations = segmentations
         self.masks = masks
         self.targets = targets
         self.target_labels = target_labels
 
-        self.rotation = rotation
-        self.random_resize_crop = random_resize_crop
-        self.color_jitter = color_jitter
-        self.transform = transform
-        self.target_transform = target_transform
-
-        self.mean = mean
-        self.std = std
-
         self.loader = loader
+
+        self.augmentation = augmentation
+        self.preparation = preparation
 
     def __len__(self):
         return len(self.samples)
@@ -74,88 +190,31 @@ class TripleDataset(torch.utils.data.Dataset):
         # special treatment if target is class labels vs. filename
         if isinstance(target, str):
             target = self.loader(target).convert('L')
-            target_is_image = True
-        else:
-            target_is_image = False
 
-        if self.color_jitter is not None:
-            trans = self.color_jitter.get_params(self.color_jitter.brightness,  self.color_jitter.contrast, self.color_jitter.saturation, self.color_jitter.hue)
-            sample = trans(sample)
+        source = (sample, mask, segment)
 
-        # apply rotation
-        if self.rotation is not None:
-            angle = self.rotation.get_params(self.rotation.degrees)
-            sample = F.rotate(sample, angle, Image.BILINEAR, self.rotation.expand, self.rotation.center)
-            mask = F.rotate(mask, angle, Image.NEAREST, self.rotation.expand, self.rotation.center)
-            segment = F.rotate(segment, angle, Image.NEAREST, self.rotation.expand, self.rotation.center)
-            if target_is_image:
-                target = F.rotate(target, angle, Image.NEAREST, self.rotation.expand, self.rotation.center)
+        if self.augmentation is not None:
+            source, target = self.augmentation.apply(source, target)
 
-        # apply RRC
-        if self.random_resize_crop is not None:
-            i, j, h, w = self.random_resize_crop.get_params(sample, self.random_resize_crop.scale,
-                                                            self.random_resize_crop.ratio)
-            sample = F.resized_crop(sample, i, j, h, w, self.random_resize_crop.size, Image.BILINEAR)
-            mask = F.resized_crop(mask, i, j, h, w, self.random_resize_crop.size, Image.NEAREST)
-            segment = F.resized_crop(segment, i, j, h, w, self.random_resize_crop.size, Image.NEAREST)
-            if target_is_image:
-                target = F.resized_crop(target, i, j, h, w, self.random_resize_crop.size, Image.NEAREST)
+        if self.preparation is not None:
+            source, target = self.preparation.apply(source, target)
 
-        # apply (target) transform
-        if self.transform is not None:
-            sample = self.transform(sample)
-            mask = self.transform(mask)
-            segment = self.transform(segment)
-            if target_is_image:
-                target = self.transform(target)
-
-        if self.target_transform is not None and not target_is_image:
-            target = self.target_transform(target)
-
-        # apply normalization
-        transforms.functional.normalize(sample, self.mean, self.std, inplace=True)
-
-        return (sample, mask, segment), target
-
-    def read_csv(self, filename, root=''):
-        df = pd.read_csv(filename, index_col=0)
-        self.samples = [os.path.join(root, v) for v in df.index.values]
-        if 'mask' in df:
-            self.masks = [os.path.join(root, v) for v in df['mask'].values]
-        if 'segmentation' in df:
-            self.segmentations = [os.path.join(root, v) for v in df['segmentation'].values]
-
-        cols = df.columns.drop(['mask', 'segmentation'], errors='ignore')
-        if cols.size == 1 and isinstance(df[cols].iloc[0], str):
-            self.targets = [os.path.join(root, v) for v in df[cols].values]
-            self.target_labels = cols
-        else:
-            self.targets = df[cols].values
-            self.target_labels = cols
-        return self
-
-    def to_csv(self, filename):
-        #TODO: implement export
-        pass
+        return source, target
 
     def __str__(self):
-        res = ''
-        res += str(self.samples) + '\n'
-        res += str(self.masks) + '\n'
-        res += str(self.segmentations) + '\n'
-        res += str(self.targets) + '\n'
-        res += str(self.target_labels) + '\n'
-        res += str(self.rotation) + '\n'
-        res += str(self.random_resize_crop) + '\n'
-        res += str(self.color_jitter) + '\n'
-        res += str(self.transform) + '\n'
-        res += str(self.target_transform) + '\n'
-        res += str(self.mean) + ' ' + str(self.std)
+        res = f'''Dataset:
+        Samples: {len(self.samples)}
+        Masks: {len(self.masks) if self.masks is not None else 0}
+        Segmentation: {len(self.segmentations) if self.segmentations is not None else 0}
+        Targets: {len(self.targets)}, classes {self.targets.shape[1]}
+        Target labels: {self.target_labels.values}
+        '''
         return res
 
     @property
     def size(self):
         return len(self)
+
 
 class PandasDataset(torch.utils.data.Dataset):
     """[summary]

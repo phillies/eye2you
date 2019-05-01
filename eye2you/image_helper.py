@@ -128,8 +128,8 @@ def split_tensor_image(img, patch_size):
     out = torch.zeros((n_x * n_y, c, patch_size, patch_size))
     for ii in range(n_x):
         for jj in range(n_y):
-            out[ii * n_y +
-                jj, :, :, :] = img[:, ii * patch_size:(ii + 1) * patch_size, jj * patch_size:(jj + 1) * patch_size]
+            out[ii * n_y + jj, :, :, :] = img[:, ii * patch_size:(ii + 1) * patch_size, jj * patch_size:(jj + 1) *
+                                              patch_size]
     return out
 
 
@@ -267,6 +267,23 @@ def show_samples_from_loader(loader, steps=0):
     grid = torch.cat((grid, grid2), dim=1)
     img = torchvision.transforms.ToPILImage()(grid)
     return img
+
+
+def loader_to_images(loader, prefix=None, max_counter=None):
+    counter = 0
+    if max_counter == None:
+        max_counter = len(loader)
+    for source, _ in loader:
+        if isinstance(source, (list, tuple)):
+            source = source[0]
+
+        nrow = int(np.ceil(np.sqrt(source.shape[0])))
+        grid = torchvision.utils.make_grid(source, nrow=nrow)
+        img = torchvision.transforms.ToPILImage()(grid)
+        img.save(prefix + f'{counter:04d}.png')
+        counter += 1
+        if counter >= max_counter:
+            break
 
 
 def visualize_iou(output, target, colormap=((0, 0, 0), (1, 1, 1), (1, 0, 0), (0, 1, 1))):
@@ -408,15 +425,14 @@ def find_retina_boxes(im,
 
     # detect circles in the image
     try:
-        circles = cv2.HoughCircles(
-            gray,
-            cv2.HOUGH_GRADIENT,
-            dp=dp,
-            minDist=minDist,
-            param1=param1,
-            param2=param2,
-            minRadius=minRadius,
-            maxRadius=maxRadius)
+        circles = cv2.HoughCircles(gray,
+                                   cv2.HOUGH_GRADIENT,
+                                   dp=dp,
+                                   minDist=minDist,
+                                   param1=param1,
+                                   param2=param2,
+                                   minRadius=minRadius,
+                                   maxRadius=maxRadius)
     except Exception as e:
         print('Something bad happened:', e)
         return None
@@ -461,31 +477,29 @@ def find_retina_boxes(im,
         if param1 > param1_limit:
             param1 -= abs(param1_step)
             print('Retry with param1=', param1)
-            return find_retina_boxes(
-                im,
-                display,
-                dp=dp,
-                param1=param1,
-                param2=param2,
-                minimum_circle_distance=minimum_circle_distance,
-                minimum_radius=minimum_radius,
-                maximum_radius=maximum_radius,
-                max_patch_size=max_patch_size,
-                max_distance_center=max_distance_center)
+            return find_retina_boxes(im,
+                                     display,
+                                     dp=dp,
+                                     param1=param1,
+                                     param2=param2,
+                                     minimum_circle_distance=minimum_circle_distance,
+                                     minimum_radius=minimum_radius,
+                                     maximum_radius=maximum_radius,
+                                     max_patch_size=max_patch_size,
+                                     max_distance_center=max_distance_center)
         elif param2 > param2_limit:
             param2 -= abs(param2_step)
             print('Retry with param2=', param2)
-            return find_retina_boxes(
-                im,
-                display,
-                dp=dp,
-                param1=param1,
-                param2=param2,
-                minimum_circle_distance=minimum_circle_distance,
-                minimum_radius=minimum_radius,
-                maximum_radius=maximum_radius,
-                max_patch_size=max_patch_size,
-                max_distance_center=max_distance_center)
+            return find_retina_boxes(im,
+                                     display,
+                                     dp=dp,
+                                     param1=param1,
+                                     param2=param2,
+                                     minimum_circle_distance=minimum_circle_distance,
+                                     minimum_radius=minimum_radius,
+                                     maximum_radius=maximum_radius,
+                                     max_patch_size=max_patch_size,
+                                     max_distance_center=max_distance_center)
         else:
             print('no luck, skipping image')
 

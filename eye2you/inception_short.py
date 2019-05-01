@@ -51,6 +51,11 @@ def inception_v3_s_plus(pretrained=False, **kwargs):
     return Inception3S(**kwargs)
 
 
+def inception_v3_s_wrap(pretrained=False, **kwargs):
+
+    return Inception3SWrap(**kwargs)
+
+
 class Inception3S(nn.Module):
 
     def __init__(self, num_classes=1000, aux_logits=True, transform_input=False, in_channels=3):
@@ -138,6 +143,13 @@ class Inception3S(nn.Module):
         if self.training and self.aux_logits:
             return x, aux
         return x
+
+
+class Inception3SWrap(Inception3S):
+
+    def forward(self, x, mask=None, segment=None):
+        x = torch.cat((x, segment), axis=1)
+        return super().forward(x)
 
 
 class Inception3XS(nn.Module):

@@ -2,9 +2,9 @@ import pandas as pd
 import torch
 import torchvision.transforms as transforms
 import tqdm
+import yaml
 
-from . import datasets
-from .dataloader import get_equal_sampler
+from . import datasets, factory
 from .net import Network
 from sklearn.linear_model import LinearRegression
 import numpy as np
@@ -71,148 +71,43 @@ class Coach():
         self.validate_data = None
         self.validate_loader = None
         self.log = None
-        self.training_parameter = None
-        self.validation_parameter = None
+        self.config = None
 
         self.epochs = 0
 
-    def initialize_network(self,
-                           device,
-                           model_name,
-                           criterion_name,
-                           optimizer_name=None,
-                           performance_meters=None,
-                           model_kwargs=None,
-                           criterion_kwargs=None,
-                           optimizer_kwargs=None,
-                           use_scheduler=False,
-                           scheduler_kwargs=None):
-        self.device = device
-        self.net = Network(device=device,
-                           model_name=model_name,
-                           criterion_name=criterion_name,
-                           optimizer_name=optimizer_name,
-                           performance_meters=performance_meters,
-                           model_kwargs=model_kwargs,
-                           criterion_kwargs=criterion_kwargs,
-                           optimizer_kwargs=optimizer_kwargs,
-                           use_scheduler=use_scheduler,
-                           scheduler_kwargs=scheduler_kwargs)
+    def load_config(self, filename):
+        self.config = factory.config_from_yaml(filename)
+
+        dataprep = datasets.DataPreparation(**self.config['data_preparation'])
+        dataaug = datasets.DataAugmentation(**self.config['data_augmentation'])
+
+        self.train_data, self.validate_data = factory.data_from_config(self.config['dataset'])
+
+        self.train_data.preparation = dataprep
+        self.train_data.augmentation = dataaug
+
+        self.validate_data.preparation = dataprep
+
+        self.train_loader = factory.get_loader(self.config['training'], self.train_data)
+
+        self.validate_loader = factory.get_loader(self.config['validation'], self.validate_data)
+
+        self.net = Network(**self.config['net'])
+        self.device = self.net.device
+
         self.log = Logger()
         self.log.columns = self.net.name_measures()
-
-    def initialize_training_data(self,
-                                 csv,
-                                 root,
-                                 num_samples=None,
-                                 batch_size=2,
-                                 num_workers=0,
-                                 shuffle=False,
-                                 weighted_sampling_classes=None,
-                                 size=None,
-                                 scale=(0.08, 1.0),
-                                 ratio=(3. / 4., 4. / 3.),
-                                 angle=None,
-                                 brightness=0,
-                                 contrast=0,
-                                 saturation=0,
-                                 hue=0,
-                                 transform=None,
-                                 target_transform=None,
-                                 mean=(0, 0, 0),
-                                 std=(1, 1, 1)):
-
-        self.training_parameter = dict()
-        self.training_parameter['csv'] = csv
-        self.training_parameter['root'] = root
-        self.training_parameter['num_samples'] = num_samples
-        self.training_parameter['batch_size'] = batch_size
-        self.training_parameter['num_workers'] = num_workers
-        self.training_parameter['shuffle'] = shuffle
-        self.training_parameter['weighted_sampling_classes'] = weighted_sampling_classes
-        self.training_parameter['size'] = size
-        self.training_parameter['scale'] = scale
-        self.training_parameter['ratio'] = ratio
-        self.training_parameter['angle'] = angle
-        self.training_parameter['brightness'] = brightness
-        self.training_parameter['contrast'] = contrast
-        self.training_parameter['saturation'] = saturation
-        self.training_parameter['hue'] = hue
-        self.training_parameter['transform'] = transform
-        self.training_parameter['target_transform'] = target_transform
-        self.training_parameter['mean'] = mean
-        self.training_parameter['std'] = std
-
-        rotation = None
-        if angle is not None:
-            rotation = transforms.RandomRotation(angle)
-        rrc = None
-        if size is not None:
-            rrc = transforms.RandomResizedCrop(size=size, scale=scale, ratio=ratio)
-        color = None
-        if not all((brightness == 0, contrast == 0, saturation == 0, hue == 0)):
-            color = transforms.ColorJitter(brightness=brightness, contrast=contrast, saturation=saturation, hue=hue)
-
-        self.train_data = datasets.TripleDataset(rotation=rotation,
-                                                 random_resize_crop=rrc,
-                                                 color_jitter=color,
-                                                 transform=transform,
-                                                 target_transform=target_transform,
-                                                 mean=mean,
-                                                 std=std)
-        self.train_data.read_csv(csv, root)
-
-        if weighted_sampling_classes is None:
-            sampler = torch.utils.data.RandomSampler(self.train_data, replacement=True, num_samples=num_samples)
-        else:
-            sampler = get_equal_sampler(self.train_data, num_samples, weighted_sampling_classes)
-        self.train_loader = torch.utils.data.DataLoader(self.train_data,
-                                                        batch_size=batch_size,
-                                                        drop_last=True,
-                                                        num_workers=num_workers,
-                                                        sampler=sampler)
-
-    def initialize_validation_data(self,
-                                   csv,
-                                   root,
-                                   batch_size=1,
-                                   num_workers=0,
-                                   shuffle=False,
-                                   transform=None,
-                                   target_transform=None,
-                                   mean=(0, 0, 0),
-                                   std=(1, 1, 1)):
-
-        self.validation_parameter = dict()
-        self.training_parameter['csv'] = csv
-        self.training_parameter['root'] = root
-        self.training_parameter['transform'] = transform
-        self.training_parameter['target_transform'] = target_transform
-        self.training_parameter['mean'] = mean
-        self.training_parameter['std'] = std
-
-        self.validate_data = datasets.TripleDataset(transform=transform,
-                                                    target_transform=target_transform,
-                                                    mean=mean,
-                                                    std=std)
-        self.validate_data.read_csv(csv, root)
-        self.validate_loader = torch.utils.data.DataLoader(self.validate_data,
-                                                           batch_size=batch_size,
-                                                           drop_last=False,
-                                                           shuffle=shuffle,
-                                                           num_workers=num_workers)
 
     def save(self, filename):
         state_dict = self.net.get_state_dict()
         state_dict['epochs'] = self.epochs
-        state_dict['training_parameter'] = self.training_parameter
-        state_dict['validation_parameter'] = self.validation_parameter
+        state_dict['config'] = self.config
         state_dict['log'] = self.log
         torch.save(state_dict, filename)
 
     def save_config(self, filename):
-        # TODO: store config as yaml ?!?
-        pass
+        with open(filename, 'w') as f:
+            yaml.safe_dump(self.config, f)
 
     def load(self, filename, device=None):
         if device is None:
@@ -223,11 +118,12 @@ class Coach():
 
         state_dict = torch.load(filename, map_location=device)
         self.epochs = state_dict['epochs']
-        self.training_parameter = state_dict['training_parameter']
-        self.validation_parameter = state_dict['validation_parameter']
+        self.config = state_dict['config']
         self.log = state_dict['log']
 
         self.net.load_state_dict(state_dict)
+        #TODO: load data sets
+        print('Data sets not loaded yet.')
 
     def run(self,
             num_epochs,

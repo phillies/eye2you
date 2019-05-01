@@ -1,29 +1,14 @@
-import torch
-import torchvision
-import torchvision.transforms as transforms
-import tqdm
+import argparse
+import os
+
+import numpy as np
 import pandas as pd
+import torch
+import yaml
+from sklearn.model_selection import StratifiedShuffleSplit
 
 from . import datasets
 from . import meter_functions as mf
-from .net import Network
-from .train import Coach
-import argparse
-import yaml
-
-
-def coach_from_dict(net_config, train_config, validate_config):
-    coach = Coach()
-    coach.initialize_training_data(**train_config)
-    coach.initialize_validation_data(**validate_config)
-    coach.initialize_network(**net_config)
-
-    return coach
-
-
-def network_from_dict(config):
-    net = Network(**config)
-    return net
 
 
 def config_from_yaml(filename):
@@ -45,185 +30,141 @@ def config_from_yaml(filename):
     return config
 
 
-def coach_from_yaml(filename):
-    with open(filename, 'r') as f:
-        config = yaml.load(f, Loader=yaml.SafeLoader)
+def load_csv(filename, root):
+    df = pd.read_csv(filename, index_col=0)
+    samples = np.array([os.path.join(root, v) for v in df.index.values])
+    masks = None
+    segmentations = None
+    if 'mask' in df:
+        masks = np.array([os.path.join(root, v) for v in df['mask'].values])
+    if 'segmentation' in df:
+        segmentations = np.array([os.path.join(root, v) for v in df['segmentation'].values])
 
-    # TODO: find better solution than eval()
-    if 'performance_meters' in config['net'] and config['net']['performance_meters'] is not None:
-        config['net']['performance_meters'] = [eval(m) for m in config['net']['performance_meters']]
-    if 'transform' in config['training'] and config['training']['transform'] is not None:
-        config['training']['transform'] = eval(config['training']['transform'])
-    if 'target_transform' in config['training'] and config['training']['target_transform'] is not None:
-        config['training']['target_transform'] = eval(config['training']['target_transform'])
-    if 'transform' in config['validation'] and config['validation']['transform'] is not None:
-        config['validation']['transform'] = eval(config['validation']['transform'])
-    if 'target_transform' in config['training'] and config['validation']['target_transform'] is not None:
-        config['validation']['target_transform'] = eval(config['validation']['target_transform'])
-
-    coach = coach_from_dict(config['net'], config['training'], config['validation'])
-
-    return coach, config['coach']
+    cols = df.columns.drop(['mask', 'segmentation'], errors='ignore')
+    if cols.size == 1 and isinstance(df[cols].iloc[0], str):
+        targets = np.array([os.path.join(root, v) for v in df[cols].values])
+        target_labels = cols
+    else:
+        targets = np.array(df[cols].values)
+        target_labels = cols
+    return samples, masks, segmentations, targets, target_labels
 
 
-def coach_from_commandline(argv):
-    parser = argparse.ArgumentParser(description='eye2you Coach')
+def data_from_config(config):
+    if 'validation' in config:
+        train_samples, train_masks, train_segmentations, train_targets, target_labels = load_csv(
+            config['csv'], config['root'])
+        validation_samples, validation_masks, validation_segmentations, validation_targets, target_labels = load_csv(
+            config['validation']['csv'], config['validation']['root'])
 
-    # Network parameter
-    netparser = parser.add_argument_group(title='Network', description='Parameter for the neural network')
-    default_device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    netparser.add_argument('--device',
-                           type=str,
-                           help='the pytorch device to run on, e.g. cuda:0 or cpu (default: cuda if available)',
-                           default=default_device)
-    netparser.add_argument('--model',
-                           dest='model_name',
-                           type=str,
-                           help='Model loader function name, e.g. inception_v3_s',
-                           required=True)
-    netparser.add_argument('--criterion',
-                           dest='criterion_name',
-                           type=str,
-                           help='Criterion name from torch.nn, e.g. L1Loss',
-                           required=True)
-    netparser.add_argument('--optimizer',
-                           dest='optimizer_name',
-                           type=str,
-                           help='Optimizer name from torch.optim, e.g. Adam')
-    netparser.add_argument('--use_scheduler',
-                           help='Use learning rate step scheduler (default: False)',
-                           action='store_true',
-                           default=False)
-    netparser.add_argument('--model_kwargs',
-                           type=str,
-                           nargs='*',
-                           help='Additional arguments passed to the model loader in format "num_classes:int(7)"')
-    netparser.add_argument('--criterion_kwargs',
-                           type=str,
-                           nargs='*',
-                           help='Additional arguments passed to the criterion in format "size_average:bool(True)"')
-    netparser.add_argument('--optimizer_kwargs',
-                           type=str,
-                           nargs='*',
-                           help='Additional arguments passed to the optimizer in format "lr:float(0.001)"')
-    netparser.add_argument('--scheduler_kwargs',
-                           type=str,
-                           nargs='*',
-                           help='Additional arguments passed to the scheduler in format "step_size:int(20)"')
-    netparser.add_argument('--performance_meters',
-                           type=str,
-                           nargs='*',
-                           help='Performance meters (such that they can be instantiated by eval)')
+    else:
+        samples, masks, segmentations, targets, target_labels = load_csv(config['csv'], config['root'])
+        sss = StratifiedShuffleSplit(n_splits=1, test_size=config['test_size'])
+        train_index, validation_index = next(iter(sss.split(X=samples, y=targets)))
 
-    # Training parameter
-    trainparser = parser.add_argument_group(title='Training data',
-                                            description='Parameter for the training dataset specification')
+        train_samples = samples[train_index]
+        validation_samples = samples[validation_index]
 
-    trainparser.add_argument('--training-csv', help='Filename of the training data csv file', required=True)
-    trainparser.add_argument('--training-root', help='Root directory of the filenames in csv file', required=True)
-    trainparser.add_argument('--training-num_samples', help='Number of samples to draw', type=int)
-    trainparser.add_argument('--training-batch-size',
-                             help='Batch size, must be >1 if batch norm is used in model (default: 2)',
-                             default=2,
-                             type=int)
-    trainparser.add_argument('--training-num_workers',
-                             help='Number of parallel workers for data loading (default: 0)',
-                             default=0,
-                             type=int)
-    trainparser.add_argument('--training-shuffle',
-                             help='Shuffle training data each epoch',
-                             default=False,
-                             action='store_true')
-    trainparser.add_argument('--training-weighted_sampling_classes',
-                             help='Set of outputs to use for weigted sampling, e.g. "range(5)"')
-    trainparser.add_argument('--training-size', help='Patch size', nargs='?', type=int)
-    trainparser.add_argument('--training-scale',
-                             help='Scale for RandomResizedCrop (default [0.08, 1.0])',
-                             nargs=2,
-                             default=(0.08, 1.0),
-                             type=float)
-    trainparser.add_argument('--training-ratio',
-                             help='Ratio for RandomResizedCrop (default [3/4, 4/3]',
-                             nargs=2,
-                             default=(3. / 4., 4. / 3.),
-                             type=float)
-    trainparser.add_argument('--training-angle', help='Angle for RandomRotation', type=int)
-    trainparser.add_argument('--training-brightness', help='Brightness for ColorJitter', default=0, type=float)
-    trainparser.add_argument('--training-contrast', help='Contrast for ColorJitter', default=0, type=float)
-    trainparser.add_argument('--training-saturation', help='Saturation for ColorJitter', default=0, type=float)
-    trainparser.add_argument('--training-hue', help='Hue for ColorJitter', default=0, type=float)
-    trainparser.add_argument('--training-transform',
-                             help='Additional transform for samples, e.g. "transforms.ToTensor()"')
-    trainparser.add_argument('--training-target_transform', help='Additional transform for targets')
-    trainparser.add_argument('--training-mean',
-                             help='Normalization mean (default [0 0 0])',
-                             default=(0, 0, 0),
-                             nargs=3,
-                             type=float)
-    trainparser.add_argument('--training-std',
-                             help='Normalization std (default [1 1 1])',
-                             default=(1, 1, 1),
-                             nargs=3,
-                             type=float)
-
-    # Validation parameter
-    valparser = parser.add_argument_group(title='Validation data',
-                                          description='Parameter for the validation dataset specification')
-    valparser.add_argument('--validation-csv', help='Filename of the validation data csv file', required=True)
-    valparser.add_argument('--validation-root', help='Root directory of the filenames in csv file', required=True)
-    valparser.add_argument('--validation-batch-size', help='Batch size (default: 1)', default=1, type=int)
-    valparser.add_argument('--validation-num_workers',
-                           help='Number of parallel workers for data loading (default: 0)',
-                           default=0,
-                           type=int)
-    valparser.add_argument('--validation-shuffle',
-                           help='Shuffle validation data each epoch',
-                           default=False,
-                           action='store_true')
-    trainparser.add_argument('--validation-transform',
-                             help='Additional transform for samples, e.g. "transforms.ToTensor()"')
-    trainparser.add_argument('--validation-target_transform', help='Additional transform for targets')
-    trainparser.add_argument('--validation-mean',
-                             help='Normalization mean (default [0 0 0])',
-                             default=(0, 0, 0),
-                             nargs=3,
-                             type=float)
-    trainparser.add_argument('--validation-std',
-                             help='Normalization std (default [1 1 1])',
-                             default=(1, 1, 1),
-                             nargs=3,
-                             type=float)
-
-    parser.add_argument('--coach_epochs', type=int, required=True)
-    parser.add_argument('--coach_logfile')
-    parser.add_argument('--coach_checkpoint')
-
-    ns = parser.parse_args(args=argv)
-    parse_dict = vars(ns)
-    train_dict = dict()
-    net_dict = dict()
-    validate_dict = dict()
-    coach_dict = dict()
-    for key in parse_dict:
-        if key.startswith('training_'):
-            train_dict[key[9:]] = parse_dict[key]
-        elif key.startswith('validation_'):
-            validate_dict[key[11:]] = parse_dict[key]
-        elif key.startswith('coach_'):
-            coach_dict[key[6:]] = parse_dict[key]
+        if masks is None:
+            train_masks = None
+            validation_masks = None
         else:
-            net_dict[key] = parse_dict[key]
+            train_masks = masks[train_index]
+            validation_masks = masks[validation_index]
 
-    print(net_dict, train_dict, validate_dict)
+        if segmentations is None:
+            train_segmentations = None
+            validation_segmentations = None
+        else:
+            train_segmentations = segmentations[train_index]
+            validation_segmentations = segmentations[validation_index]
 
-    require_eval = ('transform', 'target_transform')
-    for key in train_dict:
-        if key in require_eval:
-            train_dict[key] = eval(str(train_dict[key]))
-    for key in validate_dict:
-        if key in require_eval:
-            validate_dict[key] = eval(str(validate_dict[key]))
+        if targets.ndim == 2:
+            train_targets = targets[train_index, :]
+            validation_targets = targets[validation_index, :]
+        else:
+            train_targets = targets[train_index]
+            validation_targets = targets[validation_index]
 
-    coach = coach_from_dict(net_dict, train_dict, validate_dict)
+    training_data = datasets.TripleDataset(samples=train_samples,
+                                           masks=train_masks,
+                                           segmentations=train_segmentations,
+                                           targets=train_targets,
+                                           target_labels=target_labels)
+    validation_data = datasets.TripleDataset(samples=validation_samples,
+                                             masks=validation_masks,
+                                             segmentations=validation_segmentations,
+                                             targets=validation_targets,
+                                             target_labels=target_labels)
 
-    return coach, coach_dict
+    return training_data, validation_data
+
+
+def get_loader(config, dataset):
+    if 'drop_last' not in config or config['drop_last'] is None:
+        drop_last = False
+    else:
+        drop_last = config['drop_last']
+
+    if 'replacement' not in config or config['replacement'] is None:
+        replacement = False
+    else:
+        replacement = config['replacement']
+
+    if 'num_samples' not in config or config['num_samples'] is None:
+        if replacement:
+            num_samples = len(dataset)
+        else:
+            num_samples = None
+    else:
+        num_samples = config['num_samples']
+
+    if 'weighted_sampling_classes' in config:
+        sampler = get_equal_sampler(dataset,
+                                    num_samples=num_samples,
+                                    relevant_slice=config['weighted_sampling_classes'])
+    else:
+        sampler = torch.utils.data.RandomSampler(dataset, replacement=replacement, num_samples=num_samples)
+    loader = torch.utils.data.DataLoader(dataset,
+                                         batch_size=config['batch_size'],
+                                         shuffle=config['shuffle'],
+                                         drop_last=drop_last,
+                                         num_workers=config['num_workers'],
+                                         sampler=sampler)
+    return loader
+
+
+def get_equal_sampler(dataset, num_samples, relevant_slice=None):
+    '''The distribution of samples in training and test data is not equal, i.e.
+    the normal class is over represented. To get an unbiased sample (for example with 5
+    classes each class should make up for about 20% of the samples) we calculate the
+    probability of each class in the source data (=weights) then we invert the weights
+    and assign to each sample in the class the inverted probability (normalized to 1 over
+    all samples) and use this as the probability for the weighted random sampler.
+
+    Arguments:
+        dataset {torch.util.data.Dataset} -- the dataset to sample from
+        num_samples {int} -- number of samples to be drawn bei the sampler
+        relevant_slices {tuple} -- tuple of dimensions on which the distribution should
+        be caculated, e.g. only on dimensions (0,1) of a 3 dimensional set.
+
+    Returns:
+        torch.util.data.Sampler -- Sampler object from which patches for the training
+        or evaluation can be drawn
+    '''
+    if relevant_slice is None:
+        relevant_slice = range(dataset.targets.shape[1])
+
+    class_distribution = np.vstack([s for s in dataset.targets]).astype(np.int)[:, relevant_slice]
+    weights = np.zeros(len(relevant_slice))
+    for ii in range(len(relevant_slice)):
+        weights[ii] = np.sum(class_distribution[:, ii] == 1) / len(class_distribution)
+
+    inverted_weights = (1 / weights) / np.sum(1 / weights)
+    sampling_weights = np.zeros(class_distribution.shape[0], dtype=np.float)
+    for ii in range(len(relevant_slice)):
+        sampling_weights[class_distribution[:, ii] == 1] = inverted_weights[ii]
+    sampling_weights /= sampling_weights.sum()
+
+    sampler = torch.utils.data.WeightedRandomSampler(sampling_weights, num_samples, True)
+    return sampler

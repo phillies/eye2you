@@ -1,8 +1,9 @@
-import numpy as np
-import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+def directnet(in_channels=3, out_channels=1):
+    net = DirectNet(in_channels=in_channels, out_channels=out_channels)
+    return net
 
 class DirectNet(nn.Module):
 

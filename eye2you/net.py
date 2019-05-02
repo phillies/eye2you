@@ -186,12 +186,14 @@ class Network():
 
     def load_state_dict(self, checkpoint):
         self.model.load_state_dict(checkpoint['model'])
-        self.optimizer.load_state_dict(checkpoint['optimizer'])
+        if 'optimizer' in checkpoint:
+            self.optimizer.load_state_dict(checkpoint['optimizer'])
         if 'scheduler' in checkpoint:
             self.scheduler.load_state_dict(checkpoint['scheduler'])
 
     def get_state_dict(self):
         state_dict = dict()
+        state_dict['device'] = self.device
         state_dict['model'] = self.model.state_dict()
         state_dict['model_name'] = self.model_name
         state_dict['model_kwargs'] = self.model_kwargs
@@ -207,6 +209,45 @@ class Network():
             state_dict['criterion_kwargs'] = self.criterion_kwargs
         state_dict['performance_meters'] = [repr(p) for p in self.performance_meters]
         return state_dict
+
+    @staticmethod
+    def from_state_dict(state_dict, device=None):
+        if device is None:
+            device = state_dict['device']
+
+        if 'optimizer' in state_dict:
+            optimizer_name = state_dict['optimizer_name']
+            optimizer_kwargs = state_dict['optimizer_kwargs']
+        else:
+            optimizer_name = None
+            optimizer_kwargs = None
+
+        if 'criterion' in state_dict:
+            criterion_name = state_dict['criterion_name']
+            criterion_kwargs = state_dict['criterion_kwargs']
+        else:
+            criterion_name = None
+            criterion_kwargs = None
+
+        if 'scheduler' in state_dict:
+            use_scheduler = True
+            scheduler_kwargs=state_dict['scheduler_kwargs']
+        else:
+            use_scheduler = False
+            scheduler_kwargs = None
+
+        net = Network(device=device,
+                      model_name=state_dict['model_name'],
+                      criterion_name=criterion_name,
+                      optimizer_name=optimizer_name,
+                      performance_meters=state_dict['performance_meters'],
+                      model_kwargs=state_dict['model_kwargs'],
+                      criterion_kwargs=criterion_kwargs,
+                      optimizer_kwargs=optimizer_kwargs,
+                      use_scheduler=use_scheduler,
+                      scheduler_kwargs=scheduler_kwargs)
+        net.load_state_dict(state_dict)
+        return net
 
     def name_measures(self):
         names = ['loss']

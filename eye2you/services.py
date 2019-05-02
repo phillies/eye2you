@@ -8,17 +8,16 @@ import torch
 import torchvision
 from PIL import Image
 
-from .checker import RetinaChecker
-from .datasets import PandasDataset
-from .io_helper import merge_models_from_checkpoints
-from .image_helper import cv2_to_PIL, PIL_to_cv2, torch_to_cv2, float_to_uint8, find_retina_boxes
-from .models import u_net
+from .net import Network
+from .helper_functions import cv2_to_PIL, PIL_to_cv2, torch_to_cv2, float_to_uint8, find_retina_boxes
+from . import factory
+from . import datasets
 
 FEATURE_BLOBS = []
 
 def denormalize_transform(trans):
     for t in trans.transforms:
-        if isinstance(t, torchvision.transforms.transforms.Normalize):
+        if isinstance(t, torchvision.transforms.Normalize):
             return denormalize(t)
     return None
 
@@ -59,7 +58,7 @@ def majority_vote(predictions):
 class Service():
 
     def __init__(self, checkpoint=None, device=None):
-        self.retina_checker = None
+        self.net = None
         self.checkpoint = checkpoint
         self.transform = None
         self.model_image_size = None
@@ -76,16 +75,12 @@ class Service():
     def initialize(self):
         if self.checkpoint is None:
             raise ValueError('checkpoint cannot be None')
-        self.retina_checker = RetinaChecker(self.device)
-        self.retina_checker.initialize(self.checkpoint)
-        self.retina_checker.initialize_model()
-        self.retina_checker.initialize_criterion()
-        self.retina_checker.load_state(self.checkpoint)
+        ckpt = torch.load(self.checkpoint, map_location=self.device)
+        self.net = Network.from_state_dict(ckpt, self.device)
 
-        self.retina_checker.model.eval()
+        self.net.model.eval()
 
-        self.model_image_size = self.retina_checker.image_size
-        self.num_classes = self.retina_checker.num_classes
+        self.num_classes = list(self.net.model.children())[-1].out_features
 
         # This is the factor that the image will be scaled to before cropping the center
         # for the model. Empirically a factor between 1.0 and 1.1 yielded the best results
@@ -104,12 +99,11 @@ class Service():
             ])
 
         # This is the initialization of the class activation map extraction
-        # Yes, accessing protected members is not a good style. We'll fix that later ;-)
-        self.finalconv_name = list(self.retina_checker.model._modules.keys())[-2]  #pylint: disable=protected-access
+        self.finalconv_name = list(self.net.model.named_children())[-2][0] 
 
     def hook_feature_extractor(self):
         # hook the feature extractor
-        self.feature_extractor_hook = self.retina_checker.model._modules.get(self.finalconv_name).register_forward_hook(
+        self.feature_extractor_hook = self.net.model._modules.get(self.finalconv_name).register_forward_hook(
             hook_feature)  #pylint: disable=protected-access
 
     def unhook_feature_extractor(self):
@@ -132,42 +126,27 @@ class Service():
 
         return self._classify(x_input).squeeze()
 
-    def validate(self, file_list, root='', num_workers=0, batch_size=None):
-        dataset = PandasDataset(source=file_list, mode='csv', root=root, transform=self.transform)
-        if batch_size is None:
-            batch_size = self.retina_checker.config['hyperparameter'].getint('batch size', 32)
-
-        test_loader = torch.utils.data.DataLoader(
-            dataset=dataset, batch_size=batch_size, shuffle=False, sampler=None, num_workers=num_workers)
-
-        self.last_dataset = dataset
-        self.last_loader = test_loader
-
-        return self.retina_checker.validate(test_loader=test_loader)
-
-    def classify_images(self, file_list, root='', output_return=None, num_workers=0, batch_size=None):
-        dataset = PandasDataset(source=file_list, mode='csv', root=root, transform=self.transform)
-        if batch_size is None:
-            batch_size = self.retina_checker.config['hyperparameter'].getint('batch size', 32)
+    def classify_images(self, file_list, root='', output_return=None, num_workers=0, batch_size=1):
+        dataset = datasets.TripleDataset(*factory.load_csv(file_list, root))
 
         test_loader = torch.utils.data.DataLoader(
             dataset=dataset, batch_size=batch_size, shuffle=False, sampler=None, num_workers=num_workers)
 
         result = np.empty((len(dataset), self.num_classes))
         output_buffer = np.empty((len(dataset), self.num_classes))
-        self.retina_checker.model.eval()
+        self.net.model.eval()
         # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)
         with torch.no_grad():
             counter = 0
-            for images, labels in test_loader:
-                images = images.to(self.retina_checker.device)
+            for images, _ in test_loader:
+                images = images.to(self.net.device)
                 #labels = labels.to(self.retina_checker.device)
 
-                outputs = self.retina_checker.model(images)
+                outputs = self.net.model(images)
                 #loss = self.retina_checker.criterion(outputs, labels)
 
                 predicted = torch.nn.Sigmoid()(outputs).round()
-                num_images = predicted.size()[0]
+                num_images = predicted.shape[0]
                 result[counter:counter + num_images, :] = predicted.cpu().numpy()
                 output_buffer[counter:counter + num_images, :] = outputs.cpu().numpy()
                 counter += num_images
@@ -180,7 +159,7 @@ class Service():
 
     def _classify(self, x_input, output_return=None):
         with torch.no_grad():
-            output = self.retina_checker.model(x_input.to(self.retina_checker.device))
+            output = self.net.model(x_input.to(self.net.device))
             prediction = torch.nn.Sigmoid()(output).detach().cpu().numpy()
             if isinstance(output_return, list):
                 output_return.append(output)
@@ -205,7 +184,7 @@ class Service():
                                  min_threshold=None,
                                  max_threshold=None):
         # get the softmax weight
-        params = list(self.retina_checker.model.parameters())
+        params = list(self.net.model.parameters())
         weight_softmax = np.squeeze(params[-2].data.detach().cpu().numpy())
 
         # calculating the FEATURE_BLOBS
@@ -271,10 +250,11 @@ class Service():
     def __str__(self):
         desc = 'medAI Service:\n'
         desc += 'Loaded from {}\n'.format(self.checkpoint)
-        desc += 'RetinaChecker:\n' + self.retina_checker._str_core_info()  # pylint disable:protected-access
+        desc += 'RetinaChecker:\n' + self.net._str_core_info()  # pylint disable:protected-access
         desc += 'Transform:\n' + str(self.transform)
         return desc
 
+    @staticmethod
     def print_module_versions():
         versions = ''
         versions += 'Python: ' + sys.version
@@ -285,146 +265,6 @@ class Service():
         versions += '\nOpenCV: ' + cv2.__version__
         print(versions)
 
-
-class MEService(Service):
-
-    def __init__(self, mixture_checkpoint=None, device=None):
-        super().__init__(checkpoint=None)
-        self.checkpoint = mixture_checkpoint
-        if device is None:
-            device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        self.device = device
-        if mixture_checkpoint is not None:
-            self.initialize()
-
-    def initialize(self):
-        if self.checkpoint is None:
-            raise ValueError('checkpoint attribute must be set')
-
-        if isinstance(self.checkpoint, (list, tuple)):
-            data = merge_models_from_checkpoints(self.checkpoint, self.device)
-        else:
-            data = torch.load(self.checkpoint, map_location=self.device)
-        if 'models' not in data.keys() or 'config' not in data.keys() or 'classes' not in data.keys():
-            raise ValueError('Checkpoint must contain models, config, and classes keys')
-
-        self.number_of_experts = len(data['models'])
-        self.retina_checker = []
-        self.config = configparser.ConfigParser()
-        self.config.read_string(data['config'])
-
-        for ii in range(self.number_of_experts):
-            rc = RetinaChecker(self.device)
-            rc.initialize(self.config)
-            rc.classes = data['classes']
-            rc.initialize_model()
-            rc.initialize_criterion()
-            rc.model.load_state_dict(data['models'][ii], strict=False)
-            rc.model.eval()
-
-            # This is the initialization of the class activation map extraction
-            finalconv_name = list(rc.model._modules.keys())[-2]
-
-            self.retina_checker.append(rc)
-
-        self.model_image_size = self.retina_checker[0].image_size
-        self.num_classes = len(data['classes'])
-        self.mixture_function = majority_vote
-
-        # This is the factor that the image will be scaled to before cropping the center
-        # for the model. Empirically a factor between 1.0 and 1.1 yielded the best results
-        # as if further reduces possible small boundaries and focuses on the center of the image
-        self.test_image_size_overscaling = 1.0
-
-        self.transform = torchvision.transforms.Compose([
-            torchvision.transforms.Resize(int(self.model_image_size * self.test_image_size_overscaling)),
-            torchvision.transforms.CenterCrop(self.model_image_size),
-            torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize(self.retina_checker[0].normalize_mean,
-                                             self.retina_checker[0].normalize_std)
-        ])
-
-    def _classify(self, x_input, output_return=None):
-        with torch.no_grad():
-            pred = []
-            outputs = []
-            for ii in range(self.number_of_experts):
-                output = self.retina_checker[ii].model(x_input.to(self.retina_checker[ii].device))
-                outputs.append(output)
-                pred.append(torch.nn.Sigmoid()(output).detach().cpu().numpy())
-            prediction = np.array(pred)
-            if isinstance(output_return, list):
-                output_return.append(outputs)
-        return prediction
-
-    def get_largest_prediction(self, image):
-        '''Returns the class index of the largest prediction
-
-        Arguments:
-            image {PIL.Image.Image} -- PIL image to analyze
-
-        Returns:
-            int -- class index of the largest prediction
-        '''
-        pred = self.classify_image(image)
-        max_preds = pred.argmax(axis=1)
-        count, _ = np.histogram(max_preds, np.arange(0, pred.shape[1] + 1))
-        return int(count.argmax())
-
-    def classify_images(self, file_list, root='', output_return=None, num_workers=0, batch_size=None):
-        dataset = PandasDataset(source=file_list, mode='csv', root=root, transform=self.transform)
-        if batch_size is None:
-            batch_size = self.retina_checker[0].config['hyperparameter'].getint('batch size', 32)
-
-        test_loader = torch.utils.data.DataLoader(
-            dataset=dataset, batch_size=batch_size, shuffle=False, sampler=None, num_workers=num_workers)
-
-        result = np.empty((len(dataset), self.num_classes))
-        output_buffer = np.empty((len(dataset), self.num_classes, self.number_of_experts))
-        for rc in self.retina_checker:
-            rc.model.eval()
-        # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)
-        with torch.no_grad():
-            counter = 0
-            for images, labels in test_loader:
-                images = images.to(self.device)
-                #labels = labels.to(self.retina_checker.device)
-
-                num_images = len(images)
-                all_pred = np.empty((num_images, self.num_classes, self.number_of_experts))
-                for (ii, rc) in enumerate(self.retina_checker):
-                    outputs = rc.model(images)
-                    output_buffer[counter:counter + num_images, :, ii] = outputs.cpu().numpy()
-                    all_pred[:, :, ii] = torch.nn.Sigmoid()(outputs).round().cpu().numpy()
-
-                predicted = self.mixture_function(all_pred)
-                result[counter:counter + num_images, :] = predicted
-                counter += num_images
-
-        self.last_dataset = dataset
-        self.last_loader = test_loader
-        if isinstance(output_return, list):
-            output_return.append(output_buffer)
-        return result
-
-
-class MultiService(Service):
-
-    def __init__(self, checkpoint=None, device=None, unet_depth=2, unet_state=None):
-        super().__init__(checkpoint=None, device=device)
-        self.checkpoint = checkpoint
-        self.unet = u_net(in_channels=3, out_channels=2, depth=unet_depth).to(self.device)
-        self.unet_depth = unet_depth
-        self.unet_state = unet_state
-        if checkpoint is not None and unet_state is not None:
-            self.initialize()
-
-    def initialize(self):
-        if self.unet_state is None:
-            raise ValueError('unet_state cannot be None')
-        super().initialize()
-
-        self.unet.load_state_dict(torch.load(self.unet_state, map_location=self.device), strict=False)
 
     def get_vessels(self, img, merge_image=False, img_size=320, **kwargs):
         #apply padding so that it is divisible by 2 if size < 512, else use sliding windows of 256?!?
@@ -440,7 +280,7 @@ class MultiService(Service):
             torchvision.transforms.Resize(int(img_size)),
             torchvision.transforms.CenterCrop(img_size),
             torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize(self.retina_checker.normalize_mean, self.retina_checker.normalize_std)
+            torchvision.transforms.Normalize(self.normalize_mean, self.normalize_std)
         ])
         denorm = denormalize_transform(transform)
         x_img = transform(image)
@@ -455,7 +295,7 @@ class MultiService(Service):
 
         #mask = self.get_retina_mask(float_to_uint8(torch_to_cv2(denorm(x_img))), **kwargs)
         mask = self.get_retina_mask(PIL_to_cv2(image.resize((label.shape[1], label.shape[0]))), **kwargs)
-        
+
         vessel = cv2_to_PIL(label.numpy() * mask)
         vessel = torchvision.transforms.Resize(image.size, interpolation=Image.NEAREST)(vessel)
 
@@ -475,7 +315,7 @@ class MultiService(Service):
         if circle is None:
             mask = mask + 1
         else:
-            x, y, r_in, r_out, output = circle
+            x, y, _, r_out, _ = circle
 
             cv2.circle(mask, (x, y), r_out - 1, (255), cv2.FILLED)
         return mask

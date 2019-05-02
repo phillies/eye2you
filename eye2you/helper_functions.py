@@ -1,10 +1,85 @@
+import os
+import sys
+
+import cv2
+import imageio
 import numpy as np
 import torch
 import torchvision
-import cv2
 import tqdm
 from PIL import Image
-import imageio
+
+# Functions partially copied from torchvision
+
+IMG_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tiff']
+
+
+def pil_loader(path, mode='RGB'):
+    with open(path, 'rb') as f:
+        img = Image.open(f)
+        return img.convert(mode)
+
+
+def make_dataset(directory, class_to_idx, extensions):
+    images = []
+    directory = os.path.expanduser(directory)
+    for target in sorted(class_to_idx.keys()):
+        d = os.path.join(directory, target)
+        if not os.path.isdir(d):
+            continue
+
+        for root, _, fnames in sorted(os.walk(d)):
+            for fname in sorted(fnames):
+                if has_file_allowed_extension(fname, extensions):
+                    path = os.path.relpath(os.path.join(root, fname), directory)
+                    item = (path, class_to_idx[target])
+                    images.append(item)
+
+    return images
+
+
+def get_images(directory, extensions):
+    images = sorted([
+        os.path.join(directory, d)
+        for d in os.listdir(directory)
+        if has_file_allowed_extension(os.path.join(directory, d), extensions)
+    ])
+    return images
+
+
+def has_file_allowed_extension(filename, extensions):
+    """Checks if a file is an allowed extension.
+    Args:
+        filename (string): path to a file
+        extensions (iterable of strings): extensions to consider (lowercase)
+    Returns:
+        bool: True if the filename ends with one of given extensions
+    """
+    filename_lower = filename.lower()
+    return any(filename_lower.endswith(ext) for ext in extensions)
+
+
+def find_classes(directory):
+    """
+    Finds the class folders in a dataset.
+    Args:
+        directory (string): Root directory path.
+    Returns:
+        tuple: (classes, class_to_idx) where classes are relative to (directiry), and class_to_idx is a dictionary.
+    Ensures:
+        No class is a subdirectory of another.
+    """
+    print(sys.version_info)
+    if sys.version_info >= (3, 5):
+        # Faster and available in Python 3.5 and above
+        classes = [d.name for d in os.scandir(directory) if d.is_dir()]
+    else:
+        classes = [d for d in os.listdir(directory) if os.path.isdir(os.path.join(directory, d))]
+    classes.sort()
+    class_to_idx = {classes[i]: i for i in range(len(classes))}
+    return classes, class_to_idx
+
+
 
 
 def float_to_uint8(img, min_val=None, max_val=None):
@@ -111,7 +186,7 @@ def cv2_to_torch(img):
     return torch_img
 
 
-def split_tensor_image(img, patch_size):
+def split_tensor_image_into_patches(img, patch_size):
     '''Split a tensor into patches of (patch_size x patch_size).
     Pixels on the right get lost when patch_size does not match
 
@@ -122,7 +197,6 @@ def split_tensor_image(img, patch_size):
     Returns:
         torch.Tensor -- NCHW shaped tensor with all patches
     '''
-
     c, h, w = img.size()
     n_y = int(h / patch_size)
     n_x = int(w / patch_size)
@@ -134,7 +208,7 @@ def split_tensor_image(img, patch_size):
     return out
 
 
-def merge_tensor_image(patches):
+def merge_tensor_image_from_patches(patches):
     k, c, patch_size, _ = patches.size()
     n = int(np.sqrt(k))
     out = torch.zeros((c, patch_size * n, patch_size * n))
@@ -142,11 +216,6 @@ def merge_tensor_image(patches):
         for jj in range(n):
             out[:, ii * patch_size:(ii + 1) * patch_size, jj * patch_size:(jj + 1) * patch_size] = patches[ii * n +
                                                                                                            jj, :, :, :]
-    return out
-
-
-def merge_label_on_image(images, labels):
-    out = torch.clamp(images + labels, 0, 1)
     return out
 
 
@@ -191,6 +260,11 @@ def split_tensor_image_sliding_window_generator(img, patch_size, stride=1):
     for ii in range(n_h):
         for jj in range(n_w):
             yield img[:, ii * s_h:ii * s_h + p_h, jj * s_w:jj * s_w + p_w]
+
+
+def merge_label_on_image(images, labels):
+    out = torch.clamp(images + labels, 0, 1)
+    return out
 
 
 def merge_labels(labels, img_size, stride=1, minimum_matches=0):
@@ -257,27 +331,26 @@ def calculate_mean_and_std(samples):
         mean_b = img.reshape(-1, 3).mean(0)
         var_b = img.reshape(-1, 3).var(0)
         count_b = img.shape[0] * img.shape[1]
-        
+
         var_a = parallel_variance(mean_a, count_a, var_a, mean_b, count_b, var_b)
         mean_a = (mean_a * count_a + mean_b * count_b) / (count_a + count_b)
         count_a += count_b
     return mean_a, np.sqrt(var_a)
 
 
-def show_samples_from_loader(loader, steps=0):
+def show_samples_and_labels_from_loader(loader, iteration=0):
     loader_iter = iter(loader)
     x, y = next(loader_iter)
     try:
-        for ii in range(steps):
+        for ii in range(iteration):
             x, y = next(loader_iter)
     except StopIteration:
-        print('stopped after {0} steps, no data left'.format(ii))
+        print('stopped after {0} iterations, no data left'.format(ii))
     if y.shape[1] == 1:
         y = torch.cat((y, y, y), dim=1)
     elif y.shape[1] == 2:
         y = y[:, 1, :, :] > y[:, 0, :, :]
         y = torch.cat((y, y, y), dim=1)
-    combined = torch.cat((x, y), dim=0)
     nrow = int(np.ceil(np.sqrt(x.shape[0])))
     grid = torchvision.utils.make_grid(x, nrow=nrow)
     grid2 = torchvision.utils.make_grid(y, nrow=nrow)
@@ -286,22 +359,30 @@ def show_samples_from_loader(loader, steps=0):
     return img
 
 
-def loader_to_images(loader, prefix=None, max_counter=None):
+def loader_to_images(loader, prefix=None, max_counter=None, segment=False, mask=False, target=False):
     counter = 0
     if max_counter == None:
         max_counter = len(loader)
     for source, _ in loader:
         if isinstance(source, (list, tuple)):
-            source = source[0]
-
-        nrow = int(np.ceil(np.sqrt(source.shape[0])))
-        grid = torchvision.utils.make_grid(source, nrow=nrow)
-        img = torchvision.transforms.ToPILImage()(grid)
-        img.save(prefix + f'{counter:04d}.png')
+            save_as_image(source[0], prefix + f'{counter:04d}.png')
+            if mask:
+                save_as_image(source[1], prefix + f'{counter:04d}_mask.png')
+            if segment:
+                save_as_image(source[2], prefix + f'{counter:04d}_segment.png')
+            if target:
+                save_as_image(target, prefix + f'{counter:04d}_target.png')
+        else:
+            save_as_image(source, prefix + f'{counter:04d}.png')
         counter += 1
         if counter >= max_counter:
             break
 
+def save_as_image(source, filename):
+    nrow = int(np.ceil(np.sqrt(source.shape[0])))
+    grid = torchvision.utils.make_grid(source, nrow=nrow)
+    img = torchvision.transforms.ToPILImage()(grid)
+    img.save(filename)
 
 def visualize_iou(output, target, colormap=((0, 0, 0), (1, 1, 1), (1, 0, 0), (0, 1, 1))):
     if output.shape[1] == 2:
@@ -384,7 +465,6 @@ def denoise(img, ksize=(5, 5), morph=cv2.MORPH_RECT):
     kernel = cv2.getStructuringElement(morph, ksize)
     img = cv2.morphologyEx(img, cv2.MORPH_OPEN, kernel)
     return img
-
 
 def find_retina_boxes(im,
                       display=False,
@@ -528,7 +608,7 @@ def get_retina_mask(img):
     circle = find_retina_boxes(img)
     if circle is None:
         return mask
-    x, y, r_in, r_out, output = circle
+    x, y, _, r_out, _ = circle
 
     cv2.circle(mask, (x, y), r_out, (255), cv2.FILLED)
 

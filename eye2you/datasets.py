@@ -1,6 +1,7 @@
 import os
 import sys
 from pathlib import Path
+import random
 
 import numpy as np
 import pandas as pd
@@ -26,19 +27,23 @@ class DataAugmentation():
                  brightness=None,
                  contrast=None,
                  saturation=None,
-                 hue=None):
+                 hue=None,
+                 hflip=None,
+                 vflip=None):
         self.color_jitter = None
         self.rotation = None
         self.random_resize_crop = None
 
         if angle is not None:
             self.rotation = transforms.RandomRotation(angle)
+
         if size is not None:
             if scale is None:
                 scale = [1, 1]
             if ratio is None:
                 ratio = [1, 1]
             self.random_resize_crop = transforms.RandomResizedCrop(size=size, scale=scale, ratio=ratio)
+
         if any((brightness, contrast, saturation, hue)):
             if brightness is None:
                 brightness = 0
@@ -52,6 +57,9 @@ class DataAugmentation():
                                                        contrast=contrast,
                                                        saturation=saturation,
                                                        hue=hue)
+
+        self.hflip = hflip
+        self.vflip = vflip
 
     def apply(self, source, target):
         target_is_image = isinstance(target[0], Image.Image)
@@ -81,6 +89,22 @@ class DataAugmentation():
             if target_is_image:
                 target = F.resized_crop(target, i, j, h, w, self.random_resize_crop.size, Image.NEAREST)
 
+        if self.hflip is not None:
+            if random.random() < self.hflip:
+                sample = F.hflip(sample)
+                mask = F.hflip(mask)
+                segment = F.hflip(segment)
+                if target_is_image:
+                    target = F.hflip(target)
+
+        if self.vflip is not None:
+            if random.random() < self.hflip:
+                sample = F.vflip(sample)
+                mask = F.vflip(mask)
+                segment = F.vflip(segment)
+                if target_is_image:
+                    target = F.vflip(target)
+
         return (sample, mask, segment), target
 
     def __str__(self):
@@ -91,6 +115,10 @@ class DataAugmentation():
             trans.append(self.rotation)
         if self.random_resize_crop is not None:
             trans.append(self.random_resize_crop)
+        if self.hflip is not None:
+            trans.append(transforms.RandomHorizontalFlip(self.hflip))
+        if self.vflip is not None:
+            trans.append(transforms.RandomVerticalFlip(self.vflip))
         return 'Augmentation:\n' + str(transforms.Compose(trans))
 
 

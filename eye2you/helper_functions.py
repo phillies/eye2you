@@ -603,13 +603,31 @@ def find_retina_boxes(im,
     return None
 
 
-def get_retina_mask(img):
+def get_retina_mask(img, **kwargs):
     mask = np.zeros((img.shape[:2]), dtype=np.uint8)
-    circle = find_retina_boxes(img)
+    circle = find_retina_boxes(img, display=False, **kwargs)
     if circle is None:
-        return mask
+        return mask+1
     x, y, _, r_out, _ = circle
 
-    cv2.circle(mask, (x, y), r_out, (255), cv2.FILLED)
+    cv2.circle(mask, (x, y), r_out-1, (255), cv2.FILLED)
 
     return mask
+
+def denormalize_transform(trans):
+    for t in trans.transforms:
+        if isinstance(t, torchvision.transforms.Normalize):
+            return denormalize(t)
+    return None
+
+
+def denormalize(normalize):
+    std = 1 / np.array(normalize.std)
+    mean = np.array(normalize.mean) * -1 * std
+    denorm = torchvision.transforms.Normalize(mean=mean, std=std)
+    return denorm
+
+def denormalize_mean_std(mean, std):
+    denorm_std = 1 / np.array(std)
+    denorm_mean = np.array(mean) * -1 * std
+    return denorm_mean, denorm_std

@@ -30,17 +30,17 @@ def config_from_yaml(filename):
     return config
 
 
-def load_csv(filename, root):
+def load_csv(filename, root, mask_column_name='mask', segmentation_column_name='segmentation'):
     df = pd.read_csv(filename, index_col=0)
     samples = np.array([os.path.join(root, v) for v in df.index.values])
     masks = None
     segmentations = None
-    if 'mask' in df:
-        masks = np.array([os.path.join(root, v) for v in df['mask'].values])
-    if 'segmentation' in df:
-        segmentations = np.array([os.path.join(root, v) for v in df['segmentation'].values])
+    if mask_column_name in df:
+        masks = np.array([os.path.join(root, v) for v in df[mask_column_name].values])
+    if segmentation_column_name in df:
+        segmentations = np.array([os.path.join(root, v) for v in df[segmentation_column_name].values])
 
-    cols = df.columns.drop(['mask', 'segmentation'], errors='ignore')
+    cols = df.columns.drop([mask_column_name, segmentation_column_name], errors='ignore')
     if cols.size == 1 and isinstance(df[cols].iloc[0], str):
         targets = np.array([os.path.join(root, v) for v in df[cols].values])
         target_labels = cols

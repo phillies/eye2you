@@ -10,9 +10,7 @@ import pytest
 from PIL import Image
 
 import eye2you
-import eye2you.make_default_config
 from eye2you import models
-from eye2you.meter_functions import AccuracyMeter, AverageMeter
 
 LOCAL_DIR = pathlib.Path(os.path.dirname(os.path.realpath(__file__)))
 RANDOM_SEED = 1337
@@ -35,36 +33,6 @@ np.random.seed(RANDOM_SEED)
 def sample_data():
     data = np.random.rand(SAMPLE_NUMBER)
     return data
-
-
-def test_AccuracyMeter(sample_data):
-    meter = AccuracyMeter()
-    accuracy_data = np.round(sample_data * PSEUDO_SAMPLE_SIZE)
-    for ii in range(len(accuracy_data)):
-        meter.update(accuracy_data[ii], PSEUDO_SAMPLE_SIZE)
-    assert abs(meter.avg - accuracy_data.sum() / sample_data.size / PSEUDO_SAMPLE_SIZE) < EPSILON
-    meter.reset()
-    assert meter.avg == 0
-    assert meter.count == 0
-    assert meter.sum == 0
-    for ii in range(len(accuracy_data)):
-        meter.update(accuracy_data[ii], PSEUDO_SAMPLE_SIZE)
-    assert abs(meter.avg - accuracy_data.sum() / sample_data.size / PSEUDO_SAMPLE_SIZE) < EPSILON
-
-
-def test_AverageMeter(sample_data):
-    meter = AverageMeter()
-    for ii in range(len(sample_data)):
-        meter.update(sample_data[ii])
-    assert abs(meter.avg - sample_data.mean()) < EPSILON
-    meter.reset()
-    assert meter.avg == 0
-    assert meter.val == 0
-    assert meter.count == 0
-    assert meter.sum == 0
-    for ii in range(len(sample_data)):
-        meter.update(sample_data[ii])
-    assert abs(meter.avg - sample_data.mean()) < EPSILON
 
 
 def test_inception():
@@ -147,49 +115,17 @@ def test_performance_meters_tuple(data_labels, data_outputs):
         assert num_correct == num_correct_single[ii]
 
 
-def test_default_config(tmp_path):
-    config = eye2you.make_default_config.get_config()
-
-    assert not config is None
-    assert isinstance(config, configparser.ConfigParser)
-
-    filename = tmp_path / 'test.cfg'
-    assert not os.path.exists(filename)
-
-    eye2you.make_default_config.save_config(filename)
-    assert os.path.isfile(filename)
-
-    filename = tmp_path / 'test2.cfg'
-    assert not os.path.exists(filename)
-
-    eye2you.make_default_config.save_config(filename, config)
-    assert os.path.isfile(filename)
-
-
 def test_image_reading():
-    img = eye2you.io_helper.pil_loader(LOCAL_DIR / 'data/classA/img0.jpg')
+    img = eye2you.helper_functions.pil_loader(LOCAL_DIR / 'data/classA/img0.jpg')
     assert not img is None
     assert isinstance(img, Image.Image)
 
 
-def test_data_reading():
-    path = LOCAL_DIR / 'data'
-    classes, class_to_idx = eye2you.io_helper.find_classes(path)
-    assert len(classes) == NUMBER_OF_CLASSES
-    assert len(class_to_idx) == NUMBER_OF_CLASSES
-    for ii in range(NUMBER_OF_CLASSES):
-        assert class_to_idx[classes[ii]] == ii
-
-    class_to_idx['nonexisting_class'] = 2
-    images = eye2you.io_helper.make_dataset(path, class_to_idx, eye2you.io_helper.IMG_EXTENSIONS)
-    assert len(images) == NUMBER_OF_IMAGES
-
-
-@patch('eye2you.io_helper.sys')
+@patch('eye2you.helper_functions.sys')
 def test_data_reading_pre35(mock_sys):
     path = LOCAL_DIR / 'data'
     type(mock_sys).version_info = PropertyMock(return_value=(3, 4))
-    classes, class_to_idx = eye2you.io_helper.find_classes(path)
+    classes, class_to_idx = eye2you.helper_functions.find_classes(path)
     assert len(classes) == NUMBER_OF_CLASSES
     assert len(class_to_idx) == NUMBER_OF_CLASSES
     for ii in range(NUMBER_OF_CLASSES):

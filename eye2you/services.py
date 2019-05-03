@@ -9,23 +9,12 @@ import torchvision
 from PIL import Image
 
 from .net import Network
-from .helper_functions import cv2_to_PIL, PIL_to_cv2, torch_to_cv2, float_to_uint8, find_retina_boxes
+from .helper_functions import cv2_to_PIL, PIL_to_cv2, torch_to_cv2, float_to_uint8, find_retina_boxes, denormalize_mean_std, get_retina_mask
 from . import factory
 from . import datasets
 
 FEATURE_BLOBS = []
 
-def denormalize_transform(trans):
-    for t in trans.transforms:
-        if isinstance(t, torchvision.transforms.Normalize):
-            return denormalize(t)
-    return None
-
-def denormalize(normalize):
-    std = 1 / np.array(normalize.std)
-    mean = np.array(normalize.mean) * -1 * std
-    denorm = torchvision.transforms.Normalize(mean=mean, std=std)
-    return denorm
 
 def hook_feature(_module, _input, out, ii=0):
     FEATURE_BLOBS.append(out.data.cpu().numpy())
@@ -59,16 +48,20 @@ class Service():
 
     def __init__(self, checkpoint=None, device=None):
         self.net = None
+        self.vesselnet = None
         self.checkpoint = checkpoint
-        self.transform = None
-        self.model_image_size = None
+
         self.test_image_size_overscaling = None
+
         self.last_dataset = None
         self.last_loader = None
+
         if device is None:
             device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.device = device
+
         self.feature_extractor_hook = None
+
         if checkpoint is not None:
             self.initialize()
 
@@ -77,6 +70,9 @@ class Service():
             raise ValueError('checkpoint cannot be None')
         ckpt = torch.load(self.checkpoint, map_location=self.device)
         self.net = Network.from_state_dict(ckpt, self.device)
+        if 'vessel' in ckpt:
+            self.vesselnet = Network.from_state_dict(ckpt['vessel'], self.device)
+            self.vesselnet.eval()
 
         self.net.model.eval()
 
@@ -87,19 +83,16 @@ class Service():
         # as if further reduces possible small boundaries and focuses on the center of the image
         self.test_image_size_overscaling = 1.0
 
-        self.transform = torchvision.transforms.Compose([
-            torchvision.transforms.Resize(int(self.model_image_size * self.test_image_size_overscaling)),
-            torchvision.transforms.CenterCrop(self.model_image_size),
-            torchvision.transforms.ToTensor()
-        ])
-        if self.retina_checker.normalize_factors is not None:
-            self.transform = torchvision.transforms.Compose([
-                self.transform,
-                torchvision.transforms.Normalize(self.retina_checker.normalize_mean, self.retina_checker.normalize_std)
-            ])
+        self.data_preparation = datasets.DataPreparation(**ckpt['config']['data_preparation'])
+
+        # image size is in PIL format (width, height)!
+        if isinstance(self.data_preparation.size, (tuple, list)):
+            self.image_size = (self.data_preparation.size[1], self.data_preparation.size[0])
+        else:
+            self.image_size = (self.data_preparation.size, self.data_preparation.size)
 
         # This is the initialization of the class activation map extraction
-        self.finalconv_name = list(self.net.model.named_children())[-2][0] 
+        self.finalconv_name = list(self.net.model.named_children())[-2][0]
 
     def hook_feature_extractor(self):
         # hook the feature extractor
@@ -119,7 +112,7 @@ class Service():
             raise ValueError('Only PIL Image or numpy array supported')
 
         # Convert image to tensor
-        x_input = self.transform(image)
+        x_input = self.data_preparation.get_transform()(image)
 
         #Reshape for input intp 1,n,h,w
         x_input = x_input.unsqueeze(0)
@@ -127,14 +120,16 @@ class Service():
         return self._classify(x_input).squeeze()
 
     def classify_images(self, file_list, root='', output_return=None, num_workers=0, batch_size=1):
-        dataset = datasets.TripleDataset(*factory.load_csv(file_list, root))
+        dataset = datasets.TripleDataset(*factory.load_csv(file_list, root), preparation=self.data_preparation)
 
-        test_loader = torch.utils.data.DataLoader(
-            dataset=dataset, batch_size=batch_size, shuffle=False, sampler=None, num_workers=num_workers)
+        test_loader = torch.utils.data.DataLoader(dataset=dataset,
+                                                  batch_size=batch_size,
+                                                  shuffle=False,
+                                                  sampler=None,
+                                                  num_workers=num_workers)
 
         result = np.empty((len(dataset), self.num_classes))
         output_buffer = np.empty((len(dataset), self.num_classes))
-        self.net.model.eval()
         # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)
         with torch.no_grad():
             counter = 0
@@ -196,13 +191,13 @@ class Service():
             idx = np.arange(self.num_classes, dtype=np.int)
         elif isinstance(single_cam, int):
             idx = [single_cam]
-        elif isinstance(single_cam, tuple) or isinstance(single_cam, list):
+        elif isinstance(single_cam, (tuple, list)):
             idx = single_cam
         else:
             raise ValueError('single_cam not recognized as None, int, or tuple: {} with type {}'.format(
                 single_cam, type(single_cam)))
 
-        CAMs = returnCAM(FEATURE_BLOBS[-1], weight_softmax, idx, (self.model_image_size, self.model_image_size))
+        CAMs = returnCAM(FEATURE_BLOBS[-1], weight_softmax, idx, self.image_size)
         if as_pil_image:
             for ii, cam in enumerate(CAMs):
                 CAMs[ii] = cv2_to_PIL(cam, min_threshold, max_threshold)
@@ -250,8 +245,8 @@ class Service():
     def __str__(self):
         desc = 'medAI Service:\n'
         desc += 'Loaded from {}\n'.format(self.checkpoint)
-        desc += 'RetinaChecker:\n' + self.net._str_core_info()  # pylint disable:protected-access
-        desc += 'Transform:\n' + str(self.transform)
+        desc += 'Network:\n' + str(self.net.model_name)
+        desc += 'Transform:\n' + str(self.data_preparation.get_transform())
         return desc
 
     @staticmethod
@@ -265,8 +260,7 @@ class Service():
         versions += '\nOpenCV: ' + cv2.__version__
         print(versions)
 
-
-    def get_vessels(self, img, merge_image=False, img_size=320, **kwargs):
+    def get_vessels(self, img, merge_image=False, **kwargs):
         #apply padding so that it is divisible by 2 if size < 512, else use sliding windows of 256?!?
         if isinstance(img, np.ndarray):
             image = cv2_to_PIL(img)
@@ -276,25 +270,21 @@ class Service():
             raise ValueError('Only PIL Image or numpy array supported')
 
         print('DEMO MODE: Rescaling image to 320x320 before vessel detection')
-        transform = torchvision.transforms.Compose([
-            torchvision.transforms.Resize(int(img_size)),
-            torchvision.transforms.CenterCrop(img_size),
-            torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize(self.normalize_mean, self.normalize_std)
-        ])
-        denorm = denormalize_transform(transform)
+        transform = self.data_preparation.get_transform()
+
         x_img = transform(image)
 
         #x_img = self.transform(image)
         x_device = x_img.to(self.device).unsqueeze(0)
 
-        y_device = self.unet(x_device)
+        with torch.no_grad():
+            y_device = self.vesselnet.model(x_device)
         y_img = y_device.to('cpu')
         del x_device, y_device
         label = (y_img[:, 1, :, :] > y_img[:, 0, :, :]).float().squeeze()
 
         #mask = self.get_retina_mask(float_to_uint8(torch_to_cv2(denorm(x_img))), **kwargs)
-        mask = self.get_retina_mask(PIL_to_cv2(image.resize((label.shape[1], label.shape[0]))), **kwargs)
+        mask = get_retina_mask(PIL_to_cv2(image.resize((label.shape[1], label.shape[0]))), **kwargs)
 
         vessel = cv2_to_PIL(label.numpy() * mask)
         vessel = torchvision.transforms.Resize(image.size, interpolation=Image.NEAREST)(vessel)
@@ -305,17 +295,3 @@ class Service():
             out = np.clip(img_cv + ves_cv[:, :, None], 0, 255)
             vessel = cv2_to_PIL(out)
         return vessel
-
-    def get_retina_mask(self, img, **kwargs):
-        mask = np.zeros((img.shape[:2]), dtype=np.uint8)
-        circle = find_retina_boxes(
-            img,
-            display=False,
-            **kwargs)
-        if circle is None:
-            mask = mask + 1
-        else:
-            x, y, _, r_out, _ = circle
-
-            cv2.circle(mask, (x, y), r_out - 1, (255), cv2.FILLED)
-        return mask

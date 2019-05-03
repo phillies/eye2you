@@ -153,7 +153,7 @@ class DataPreparation():
 
         return (sample, mask, segment), target
 
-    def __str__(self):
+    def get_transform(self):
         trans = []
         if self.size is not None:
             trans.append(transforms.Resize(self.size))
@@ -162,7 +162,10 @@ class DataPreparation():
         trans.append(self.transform)
         if self.mean is not None and self.std is not None:
             trans.append(transforms.Normalize(self.mean, self.std))
-        return 'Preparation:\n' + str(transforms.Compose(trans))
+        return transforms.Compose(trans)
+
+    def __str__(self):
+        return 'Preparation:\n' + str(self.get_transform())
 
 
 class TripleDataset(torch.utils.data.Dataset):

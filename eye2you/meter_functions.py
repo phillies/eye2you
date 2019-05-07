@@ -146,7 +146,10 @@ def segmentation_recall(predictions, targets):
         t = targets[ii, 0, :, :]
         p = predictions[ii, 0, :, :]
         correct = np.logical_and(t, p)
-        res[ii] = float(correct.sum()) / float(t.sum())
+        if t.sum() > 0:
+            res[ii] = float(correct.sum()) / float(t.sum())
+        else:
+            res[ii] = 0
 
     return res
 
@@ -179,7 +182,10 @@ def segmentation_specificity(predictions, targets):
         t = targets[ii, 0, :, :]
         p = predictions[ii, 0, :, :]
         correct = np.logical_and(1 - t, 1 - p)
-        res[ii] = float(correct.sum()) / float((1 - t).sum())
+        if float((1 - t).sum()) > 0:
+            res[ii] = float(correct.sum()) / float((1 - t).sum())
+        else:
+            res[ii] = 0
 
     return res
 

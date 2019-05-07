@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import torch
 import yaml
-from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.model_selection import StratifiedShuffleSplit, ShuffleSplit
 
 from . import datasets
 from . import meter_functions as mf
@@ -59,8 +59,12 @@ def data_from_config(config):
 
     else:
         samples, masks, segmentations, targets, target_labels = load_csv(config['csv'], config['root'])
-        sss = StratifiedShuffleSplit(n_splits=1, test_size=config['test_size'])
-        train_index, validation_index = next(iter(sss.split(X=samples, y=targets)))
+        if 'stratified' in config and config['stratified']:
+            sss = StratifiedShuffleSplit(n_splits=1, test_size=config['test_size'])
+            train_index, validation_index = next(iter(sss.split(X=samples, y=targets)))
+        else:
+            ss = ShuffleSplit(n_splits=1, test_size=config['test_size'])
+            train_index, validation_index = next(iter(ss.split(X=samples)))
 
         train_samples = samples[train_index]
         validation_samples = samples[validation_index]

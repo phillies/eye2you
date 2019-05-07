@@ -43,6 +43,55 @@ def majority_vote(predictions):
     result = (np.count_nonzero(predictions, axis=2) > predictions.shape[2] / 2) * 1.0
     return result
 
+class SimpleService():
+
+    def __init__(self, checkpoint, device=None):
+        self.net = None
+        self.checkpoint = checkpoint
+
+        if device is None:
+            device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        self.device = device
+
+        if checkpoint is not None:
+            self.initialize()
+
+    def initialize(self):
+        if self.checkpoint is None:
+            raise ValueError('checkpoint cannot be None')
+        ckpt = torch.load(self.checkpoint, map_location=self.device)
+        self.net = Network.from_state_dict(ckpt, self.device)
+
+        self.net.model.eval()
+
+        self.data_preparation = datasets.DataPreparation(**ckpt['config']['data_preparation'])
+
+        # image size is in PIL format (width, height)!
+        if isinstance(self.data_preparation.size, (tuple, list)):
+            self.image_size = (self.data_preparation.size[1], self.data_preparation.size[0])
+        else:
+            self.image_size = (self.data_preparation.size, self.data_preparation.size)
+
+    def classify_image(self, img):
+        if isinstance(img, np.ndarray):
+            image = cv2_to_PIL(img)
+        elif isinstance(img, Image.Image):
+            image = img
+        else:
+            raise ValueError('Only PIL Image or numpy array supported')
+
+        # Convert image to tensor
+        x_input = self.data_preparation.get_transform()(image)
+
+        #Reshape for input intp 1,n,h,w
+        x_input = x_input.unsqueeze(0)
+
+        with torch.no_grad():
+            output = self.net.model(x_input.to(self.net.device))
+
+        return output.squeeze()
+
+
 
 class Service():
 
@@ -281,7 +330,7 @@ class Service():
             y_device = self.vesselnet.model(x_device)
         y_img = y_device.to('cpu')
         del x_device, y_device
-        label = (y_img[:, 1, :, :] > y_img[:, 0, :, :]).float().squeeze()
+        label = y_img.round().squeeze()
 
         #mask = self.get_retina_mask(float_to_uint8(torch_to_cv2(denorm(x_img))), **kwargs)
         mask = get_retina_mask(PIL_to_cv2(image.resize((label.shape[1], label.shape[0]))), **kwargs)

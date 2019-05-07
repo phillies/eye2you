@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-def u_net(in_channels=3, out_channels=2, depth=2, bias=False, final_layer='sigmoid'):
+def u_net(in_channels=3, out_channels=2, depth=2, bias=False, final_layer='sigmoid', pretrained=False):
     UnetClass = None
     if depth == 1:
         UnetClass = Unet1
@@ -14,18 +14,20 @@ def u_net(in_channels=3, out_channels=2, depth=2, bias=False, final_layer='sigmo
         UnetClass = Unet3
     else:
         UnetClass = Unet4
-    return UnetClass(in_channels=in_channels, out_channels=out_channels, final_layer=final_layer)
+    net = UnetClass(in_channels=in_channels, out_channels=out_channels, final_layer=final_layer)
+    if pretrained:
+        pass
+    return net
 
 
 def u_net_rec(in_channels=3, out_channels=2, depth=2, bias=False, final_layer='sigmoid'):
-    return Unet(
-        in_channels=in_channels,
-        out_channels=out_channels,
-        depth=depth,
-        bias=bias,
-        final_layer=final_layer,
-        upconv_batch=False,
-        top_layer=True)
+    return Unet(in_channels=in_channels,
+                out_channels=out_channels,
+                depth=depth,
+                bias=bias,
+                final_layer=final_layer,
+                upconv_batch=False,
+                top_layer=True)
 
 
 class Unet(nn.Module):
@@ -51,19 +53,21 @@ class Unet(nn.Module):
         if depth <= 1:
             self.inner = BasicBlock2d(in_channels=2 * c_inner, out_channels=4 * c_inner, bias=bias)
         else:
-            self.inner = Unet(
-                in_channels=2 * c_inner,
-                out_channels=4 * c_inner,
-                depth=depth - 1,
-                top_layer=False,
-                bias=bias,
-                upconv_batch=upconv_batch)
+            self.inner = Unet(in_channels=2 * c_inner,
+                              out_channels=4 * c_inner,
+                              depth=depth - 1,
+                              top_layer=False,
+                              bias=bias,
+                              upconv_batch=upconv_batch)
         self.up = UpConv2d(in_channels=4 * c_inner, out_channels=2 * c_inner, batch_norm=upconv_batch, bias=bias)
         self.conv_out = BasicBlock2d(in_channels=4 * c_inner, out_channels=2 * c_inner, bias=bias)
 
         if top_layer:
-            self.out = nn.Conv2d(
-                in_channels=2 * c_inner, out_channels=out_channels, kernel_size=1, padding=0, bias=bias)
+            self.out = nn.Conv2d(in_channels=2 * c_inner,
+                                 out_channels=out_channels,
+                                 kernel_size=1,
+                                 padding=0,
+                                 bias=bias)
             if final_layer == 'sigmoid':
                 self.final = nn.Sigmoid()
             elif final_layer == 'softmax':
@@ -71,7 +75,7 @@ class Unet(nn.Module):
             else:
                 self.final = lambda x: x
 
-    def forward(self, x):
+    def forward(self, x, *args):
         #print(x.size())
         x = self.conv_in(x)
         #print(x.size())
@@ -123,7 +127,7 @@ class Unet1(nn.Module):
         else:
             self.final = lambda x: x
 
-    def forward(self, x):
+    def forward(self, x, *args):
         x = self.block1(x)
         x_res1 = x.clone()
 
@@ -176,7 +180,7 @@ class Unet2(nn.Module):
         else:
             self.final = lambda x: x
 
-    def forward(self, x):
+    def forward(self, x, *args):
         x = self.block1(x)
         x_res1 = x.clone()
         x = self.max1(x)
@@ -241,7 +245,7 @@ class Unet3(nn.Module):
         else:
             self.final = lambda x: x
 
-    def forward(self, x):
+    def forward(self, x, *args):
         x = self.inblock1(x)
         x_res1 = x.clone()
         x = self.max1(x)
@@ -323,7 +327,7 @@ class Unet4(nn.Module):
         else:
             self.final = lambda x: x
 
-    def forward(self, x):
+    def forward(self, x, *args):
         x = self.inblock1(x)
         x_res1 = x.clone()
         x = self.max1(x)
@@ -383,22 +387,20 @@ class BasicBlock2d(nn.Module):
 
     def __init__(self, in_channels, out_channels, kernel_size=3, padding=1, stride=1, bias=False, momentum=0.1):
         super().__init__()
-        self.conv1 = nn.Conv2d(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel_size=kernel_size,
-            padding=padding,
-            stride=stride,
-            bias=bias)
+        self.conv1 = nn.Conv2d(in_channels=in_channels,
+                               out_channels=out_channels,
+                               kernel_size=kernel_size,
+                               padding=padding,
+                               stride=stride,
+                               bias=bias)
         self.bn1 = nn.BatchNorm2d(out_channels, momentum=momentum)
         self.relu1 = nn.ReLU(inplace=True)
-        self.conv2 = nn.Conv2d(
-            in_channels=out_channels,
-            out_channels=out_channels,
-            kernel_size=kernel_size,
-            padding=padding,
-            stride=stride,
-            bias=bias)
+        self.conv2 = nn.Conv2d(in_channels=out_channels,
+                               out_channels=out_channels,
+                               kernel_size=kernel_size,
+                               padding=padding,
+                               stride=stride,
+                               bias=bias)
         self.bn2 = nn.BatchNorm2d(out_channels, momentum=momentum)
         self.relu2 = nn.ReLU(inplace=True)
 
@@ -428,13 +430,12 @@ class UpConv2d(nn.Module):
                  relu=False):
         super().__init__()
         #self.up = nn.Upsample(scale_factor=2, mode='nearest')
-        self.conv = nn.ConvTranspose2d(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel_size=kernel_size,
-            padding=padding,
-            stride=stride,
-            bias=bias)
+        self.conv = nn.ConvTranspose2d(in_channels=in_channels,
+                                       out_channels=out_channels,
+                                       kernel_size=kernel_size,
+                                       padding=padding,
+                                       stride=stride,
+                                       bias=bias)
         if batch_norm:
             self.bn = nn.BatchNorm2d(out_channels)
         else:

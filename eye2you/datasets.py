@@ -55,7 +55,7 @@ class DataAugmentation():
         self.vflip = vflip
 
     def apply(self, source, target):
-        target_is_image = isinstance(target[0], Image.Image)
+        target_is_image = isinstance(target, Image.Image)
         sample, mask, segment = source
 
         if self.color_jitter is not None:
@@ -126,25 +126,31 @@ class DataPreparation():
 
     def apply(self, source, target):
         sample, mask, segment = source
-        target_is_image = isinstance(target[0], Image.Image)
+        target_is_image = isinstance(target, Image.Image)
 
         if self.size is not None:
             sample = F.resize(sample, self.size, interpolation=Image.BILINEAR)
-            mask = F.resize(mask, self.size, interpolation=Image.NEAREST)
-            segment = F.resize(segment, self.size, interpolation=Image.NEAREST)
+            if mask is not None:
+                mask = F.resize(mask, self.size, interpolation=Image.NEAREST)
+            if segment is not None:
+                segment = F.resize(segment, self.size, interpolation=Image.NEAREST)
             if target_is_image:
                 target = F.resize(target, self.size, interpolation=Image.NEAREST)
 
         if self.crop is not None:
             sample = F.center_crop(sample, self.size)
-            mask = F.center_crop(mask, self.size)
-            segment = F.center_crop(segment, self.size)
+            if mask is not None:
+                mask = F.center_crop(mask, self.size)
+            if segment is not None:
+                segment = F.center_crop(segment, self.size)
             if target_is_image:
                 target = F.center_crop(target, self.size)
 
         sample = self.transform(sample)
-        mask = self.transform(mask)
-        segment = self.transform(segment)
+        if mask is not None:
+            mask = self.transform(mask)
+        if segment is not None:
+            segment = self.transform(segment)
         if target_is_image:
             target = self.transform(target)
 

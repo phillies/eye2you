@@ -21,6 +21,7 @@ def all_or_nothing_performance(labels, outputs):
     num_correct = float(perf.sum())
     return num_correct
 
+
 def segmentation_accuracy(predictions, targets):
     '''[summary]
 
@@ -109,7 +110,10 @@ def segmentation_precision(predictions, targets):
         p = predictions[ii, 0, :, :]
         correct = np.logical_and(t, p)
         correct_plus_false_positive = np.logical_or(correct, p)
-        res[ii] = float(correct.sum()) / float(correct_plus_false_positive.sum())
+        if float(correct_plus_false_positive.sum()) > 0:
+            res[ii] = float(correct.sum()) / float(correct_plus_false_positive.sum())
+        else:
+            res[ii] = 0.0
 
     return res
 
@@ -314,7 +318,7 @@ class SegmentationMeter(PerformanceMeter):
         self.results = []
 
     def update(self, output, target):
-        res = segmentation_all(output, target)
+        res = segmentation_all(output.round().detach().cpu().numpy(), target.detach().cpu().numpy())
         self.results.append(res)
         return self.value()
 
@@ -338,7 +342,7 @@ class SegmentationAccuracyMeter(PerformanceMeter):
         self.results = []
 
     def update(self, output, target):
-        res = segmentation_accuracy(output, target)
+        res = segmentation_accuracy(output.round().detach().cpu().numpy(), target.detach().cpu().numpy())
         self.results.append(res)
         return self.value()
 
@@ -362,7 +366,7 @@ class SegmentationPrecisionMeter(PerformanceMeter):
         self.results = []
 
     def update(self, output, target):
-        res = segmentation_recall(output, target)
+        res = segmentation_precision(output.round().detach().cpu().numpy(), target.detach().cpu().numpy())
         self.results.append(res)
         return self.value()
 
@@ -386,7 +390,7 @@ class SegmentationRecallMeter(PerformanceMeter):
         self.results = []
 
     def update(self, output, target):
-        res = segmentation_recall(output, target)
+        res = segmentation_recall(output.round().detach().cpu().numpy(), target.detach().cpu().numpy())
         self.results.append(res)
         return self.value()
 
@@ -410,7 +414,7 @@ class SegmentationSpecificityMeter(PerformanceMeter):
         self.results = []
 
     def update(self, output, target):
-        res = segmentation_specificity(output, target)
+        res = segmentation_specificity(output.round().detach().cpu().numpy(), target.detach().cpu().numpy())
         self.results.append(res)
         return self.value()
 
@@ -434,7 +438,7 @@ class SegmentationIOUMeter(PerformanceMeter):
         self.results = []
 
     def update(self, output, target):
-        res = segmentation_iou(output, target)
+        res = segmentation_iou(output.round().detach().cpu().numpy(), target.detach().cpu().numpy())
         self.results.append(res)
         return self.value()
 
@@ -458,7 +462,7 @@ class SegmentationDiceMeter(PerformanceMeter):
         self.results = []
 
     def update(self, output, target):
-        res = segmentation_dice(output, target)
+        res = segmentation_dice(output.round().detach().cpu().numpy(), target.detach().cpu().numpy())
         self.results.append(res)
         return self.value()
 

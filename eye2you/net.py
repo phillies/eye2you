@@ -73,7 +73,7 @@ class Network():
         if self.model_name in models.__dict__.keys():
             model_loader = models.__dict__[self.model_name]
         else:
-            warnings.warn('Could not identify model')
+            warnings.warn(f'Could not identify model {self.model_name}')
             return
 
         self.model = model_loader(pretrained=pretrained, **kwargs)
@@ -87,7 +87,7 @@ class Network():
         if self.criterion_name in nn.__dict__.keys():
             criterion_loader = nn.__dict__[self.criterion_name]
         else:
-            warnings.warn('Could not identify criterion')
+            warnings.warn(f'Could not identify criterion {self.criterion_name}')
             return
 
         self.criterion = criterion_loader(**kwargs)
@@ -115,7 +115,7 @@ class Network():
             self.scheduler.step()
 
         total_loss = 0
-        num_batches = len(loader)
+        num_batches = int(loader.sampler.num_samples / loader.batch_size)
         num_samples = num_batches * loader.batch_size  #due to drop_last it's not len(loader.dataset)
 
         for perf_meter in self.performance_meters:
@@ -157,8 +157,8 @@ class Network():
         self.model.eval()
 
         total_loss = 0
-        num_samples = len(loader.dataset)
-        num_batches = len(loader)
+        num_samples = loader.sampler.num_samples
+        num_batches = int(loader.sampler.num_samples / loader.batch_size)
 
         for perf_meter in self.performance_meters:
             perf_meter.reset()
@@ -231,7 +231,7 @@ class Network():
 
         if 'scheduler' in state_dict:
             use_scheduler = True
-            scheduler_kwargs=state_dict['scheduler_kwargs']
+            scheduler_kwargs = state_dict['scheduler_kwargs']
         else:
             use_scheduler = False
             scheduler_kwargs = None

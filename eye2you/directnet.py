@@ -1,9 +1,11 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 def directnet(in_channels=3, out_channels=1):
     net = DirectNet(in_channels=in_channels, out_channels=out_channels)
     return net
+
 
 class DirectNet(nn.Module):
 
@@ -35,7 +37,7 @@ class DirectNet(nn.Module):
         self.sep9 = DepthSeparable2d(in_channels=64, out_channels=16, kernel_size=7, padding=3, groups=16)
         self.sep10 = DepthSeparable2d(in_channels=16, out_channels=out_channels, kernel_size=5, padding=2, groups=1)
 
-    def forward(self, x):
+    def forward(self, x, *args):
         x = self.conv1(x)
         x = self.conv2(x)
 
@@ -91,14 +93,13 @@ class Basic2d(nn.Module):
                  momentum=0.1,
                  relu=True):
         super().__init__()
-        self.conv = nn.Conv2d(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel_size=kernel_size,
-            padding=padding,
-            stride=stride,
-            groups=groups,
-            bias=bias)
+        self.conv = nn.Conv2d(in_channels=in_channels,
+                              out_channels=out_channels,
+                              kernel_size=kernel_size,
+                              padding=padding,
+                              stride=stride,
+                              groups=groups,
+                              bias=bias)
         self.bn = nn.BatchNorm2d(out_channels, momentum=momentum)
         if relu:
             self.relu = nn.ReLU(inplace=True)
@@ -128,20 +129,18 @@ class SpatialSeparable2d(nn.Module):
                  momentum=0.1,
                  relu=True):
         super().__init__()
-        self.convH = nn.Conv2d(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel_size=(kernel_size, 1),
-            padding=(padding, 0),
-            stride=stride,
-            bias=bias)
-        self.convW = nn.Conv2d(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel_size=(1, kernel_size),
-            padding=(0, padding),
-            stride=stride,
-            bias=bias)
+        self.convH = nn.Conv2d(in_channels=in_channels,
+                               out_channels=out_channels,
+                               kernel_size=(kernel_size, 1),
+                               padding=(padding, 0),
+                               stride=stride,
+                               bias=bias)
+        self.convW = nn.Conv2d(in_channels=in_channels,
+                               out_channels=out_channels,
+                               kernel_size=(1, kernel_size),
+                               padding=(0, padding),
+                               stride=stride,
+                               bias=bias)
         self.bn = nn.BatchNorm2d(out_channels, momentum=momentum)
         if relu:
             self.relu = nn.ReLU(inplace=True)
@@ -182,8 +181,12 @@ class DepthSeparable2d(nn.Module):
             groups=in_channels,
             bias=bias,
         )
-        self.conv_point = nn.Conv2d(
-            in_channels=in_channels, out_channels=out_channels, kernel_size=1, padding=0, stride=stride, bias=bias)
+        self.conv_point = nn.Conv2d(in_channels=in_channels,
+                                    out_channels=out_channels,
+                                    kernel_size=1,
+                                    padding=0,
+                                    stride=stride,
+                                    bias=bias)
         self.bn = nn.BatchNorm2d(out_channels, momentum=momentum)
         if relu:
             self.relu = nn.ReLU(inplace=True)

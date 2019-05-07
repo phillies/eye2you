@@ -10,7 +10,14 @@ import torch.nn.functional as F
 from torch.utils import model_zoo
 from torchvision.models.inception import BasicConv2d, InceptionA, InceptionB, InceptionC
 
-__all__ = ['Inception3S', 'Inception3XS', 'inception_v3_s', 'inception_v3_xs']
+__all__ = [
+    'Inception3S',
+    'Inception3XS',
+    'inception_v3_s',
+    'inception_v3_xs',
+    'inception_v3_s_plus',
+    'inception_v3_s_wrap',
+]
 
 model_urls = {
     'inception_v3_s': 'https://eye2you.org/models/inception_v3_s_eye2you-2bea754f.pth',
@@ -148,7 +155,9 @@ class Inception3S(nn.Module):
 class Inception3SWrap(Inception3S):
 
     def forward(self, x, mask=None, segment=None):
-        x = torch.cat((x, segment), axis=1)
+        x = torch.cat((x, segment), dim=1)
+        if mask is not None:
+            x = x * mask
         return super().forward(x)
 
 

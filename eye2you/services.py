@@ -72,7 +72,7 @@ class Service():
         self.net = Network.from_state_dict(ckpt, self.device)
         if 'vessel' in ckpt:
             self.vesselnet = Network.from_state_dict(ckpt['vessel'], self.device)
-            self.vesselnet.eval()
+            self.vesselnet.model.eval()
 
         self.net.model.eval()
 

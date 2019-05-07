@@ -11,34 +11,37 @@ from PIL import Image
 
 # Functions partially copied from torchvision
 
-IMG_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tiff']
+IMG_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tiff')
 
 
 def pil_loader(path, mode='RGB'):
+    """load an image using PIL/Pillow
+    
+    Arguments:
+        path {str} -- file name (and path)
+    
+    Keyword Arguments:
+        mode {str} -- Convert the image to given mode (default: {'RGB'})
+    
+    Returns:
+        PIL.Image.Image -- Converted PIL Image
+    """
     with open(path, 'rb') as f:
         img = Image.open(f)
         return img.convert(mode)
 
 
-def make_dataset(directory, class_to_idx, extensions):
-    images = []
-    directory = os.path.expanduser(directory)
-    for target in sorted(class_to_idx.keys()):
-        d = os.path.join(directory, target)
-        if not os.path.isdir(d):
-            continue
-
-        for root, _, fnames in sorted(os.walk(d)):
-            for fname in sorted(fnames):
-                if has_file_allowed_extension(fname, extensions):
-                    path = os.path.relpath(os.path.join(root, fname), directory)
-                    item = (path, class_to_idx[target])
-                    images.append(item)
-
-    return images
-
-
-def get_images(directory, extensions):
+def get_images(directory, extensions=IMG_EXTENSIONS):
+    """retrieves all images from a given directory with
+    the given extensions in alphabetical order
+    
+    Arguments:
+        directory {str} -- directory name
+        extensions {list} -- List of allowed extensions (as string)
+    
+    Returns:
+        list -- list of image file names (including directory)
+    """
     images = sorted([
         os.path.join(directory, d)
         for d in os.listdir(directory)
@@ -59,36 +62,27 @@ def has_file_allowed_extension(filename, extensions):
     return any(filename_lower.endswith(ext) for ext in extensions)
 
 
-def find_classes(directory):
-    """
-    Finds the class folders in a dataset.
-    Args:
-        directory (string): Root directory path.
-    Returns:
-        tuple: (classes, class_to_idx) where classes are relative to (directiry), and class_to_idx is a dictionary.
-    Ensures:
-        No class is a subdirectory of another.
-    """
-    print(sys.version_info)
-    if sys.version_info >= (3, 5):
-        # Faster and available in Python 3.5 and above
-        classes = [d.name for d in os.scandir(directory) if d.is_dir()]
-    else:
-        classes = [d for d in os.listdir(directory) if os.path.isdir(os.path.join(directory, d))]
-    classes.sort()
-    class_to_idx = {classes[i]: i for i in range(len(classes))}
-    return classes, class_to_idx
-
-
-
-
 def float_to_uint8(img, min_val=None, max_val=None):
+    """Convert floating point image to uint8 image setting 0 to min_val and
+    255 to max_val. If either is None the min/max of the float image is taken.
+    
+    Arguments:
+        img {array} -- Numpy array or torch tensor
+    
+    Keyword Arguments:
+        min_val {float} -- minimum value set to 0 in uint8 format (default: {None})
+        max_val {float} -- maximum value set to 255 in uint8 format (default: {None})
+    
+    Returns:
+        np.ndarray -- uint8 format array
+    """
     if min_val is None:
         min_val = img.min()
     if max_val is None:
         max_val = img.max()
     img_scale = img - min_val
     img_scale = img_scale / (max_val - min_val)
+    img_scale = np.clip(img_scale, 0, 1)
     img_scale = (img_scale * 255).astype(np.ubyte)
     return img_scale
 
@@ -113,10 +107,10 @@ def PIL_to_torch(img):
         img {PIL.Image} -- PIL image object
 
     Returns:
-        torch.Tensor -- torch tensor with same data as PIL image
+        torch.Tensor -- torch tensor with same data as PIL image, NCHW shape
     '''
 
-    return torchvision.transforms.ToTensor()(img)
+    return (torchvision.transforms.ToTensor()(img)).unsqueeze(0)
 
 
 def torch_to_PIL(img):
@@ -129,11 +123,11 @@ def torch_to_PIL(img):
         PIL.Image -- PIL Image with same data as torch tensor
     '''
 
-    return torchvision.transforms.ToPILImage()(img)
+    return torchvision.transforms.ToPILImage()(img.squeeze())
 
 
 def torch_to_cv2(img):
-    '''Converts torch format (NCHW) to cv2 format (HWC)
+    '''Converts torch format (NCHW or CHW) to cv2 format (HWC)
 
     Arguments:
         img {torch.Tensor} -- NCHW shaped with n=1 or CHW shaped torch tensor
@@ -172,16 +166,13 @@ def cv2_to_torch(img):
     '''Converts cv2 format (HWC) to torch format (NCHW)
 
     Arguments:
-        img {numpy.array} -- Numpy array compatible to PIL, e.g. h,w,1 or h,w,3 shaped
+        img {numpy.array} -- Numpy array in HWC format
 
-    Keyword Arguments:
-        min_val {float} -- lower bound for scaling (default: {None})
-        max_val {float} -- upper bound for scaling (default: {None})
 
     Returns:
-        [PIL.Image] -- PIL image in uint8 format
+        torch.Tensor -- NCHW torch tensor
     '''
-    img = np.transpose(img, axes=(1, 2, 0))
+    img = np.transpose(img, axes=(2, 0, 1))
     torch_img = torch.Tensor(img).unsqueeze(0)
     return torch_img
 
@@ -201,20 +192,35 @@ def split_tensor_image_into_patches(img, patch_size):
     n_y = int(h / patch_size)
     n_x = int(w / patch_size)
     out = torch.zeros((n_x * n_y, c, patch_size, patch_size))
-    for ii in range(n_x):
-        for jj in range(n_y):
-            out[ii * n_y + jj, :, :, :] = img[:, ii * patch_size:(ii + 1) * patch_size, jj * patch_size:(jj + 1) *
+    for ii in range(n_y):
+        for jj in range(n_x):
+            out[ii * n_x + jj, :, :, :] = img[:, ii * patch_size:(ii + 1) * patch_size, jj * patch_size:(jj + 1) *
                                               patch_size]
     return out
 
 
-def merge_tensor_image_from_patches(patches):
+def merge_tensor_image_from_patches(patches, shape=None):
+    """Assembles patches to an image
+    
+    Arguments:
+        patches {[type]} -- [description]
+    
+    Keyword Arguments:
+        shape {[type]} -- [description] (default: {None})
+    
+    Returns:
+        [type] -- [description]
+    """
     k, c, patch_size, _ = patches.size()
-    n = int(np.sqrt(k))
-    out = torch.zeros((c, patch_size * n, patch_size * n))
-    for ii in range(n):
-        for jj in range(n):
-            out[:, ii * patch_size:(ii + 1) * patch_size, jj * patch_size:(jj + 1) * patch_size] = patches[ii * n +
+    if shape is None:
+        n_h = int(np.sqrt(k))
+        n_w = n_h
+    else:
+        n_h, n_w = shape
+    out = torch.zeros((c, patch_size * n_h, patch_size * n_w))
+    for ii in range(n_h):
+        for jj in range(n_w):
+            out[:, ii * patch_size:(ii + 1) * patch_size, jj * patch_size:(jj + 1) * patch_size] = patches[ii * n_w +
                                                                                                            jj, :, :, :]
     return out
 

@@ -104,7 +104,7 @@ def data_from_config(config):
     return training_data, validation_data
 
 
-def get_loader(config, dataset):
+def get_loader(config, dataset, step=None):
     if 'drop_last' not in config or config['drop_last'] is None:
         drop_last = False
     else:
@@ -129,8 +129,14 @@ def get_loader(config, dataset):
                                     relevant_slice=config['weighted_sampling_classes'])
     else:
         sampler = torch.utils.data.RandomSampler(dataset, replacement=replacement, num_samples=num_samples)
+
+    if step is not None and 'batch_size_increase' in  config and config['batch_size_increase'] is not None:
+        batch_size = config['batch_size'] + step * config['batch_size_increase']
+    else:
+        batch_size = config['batch_size']
+
     loader = torch.utils.data.DataLoader(dataset,
-                                         batch_size=config['batch_size'],
+                                         batch_size=batch_size,
                                          shuffle=config['shuffle'],
                                          drop_last=drop_last,
                                          num_workers=config['num_workers'],

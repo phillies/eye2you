@@ -55,7 +55,7 @@ class DataAugmentation():
         self.vflip = vflip
 
     def apply(self, source, target):
-        target_is_image = isinstance(target, Image.Image)
+        target_is_image = isinstance(target[0], Image.Image)
         sample, mask, segment = source
 
         if self.color_jitter is not None:
@@ -70,7 +70,8 @@ class DataAugmentation():
             mask = F.rotate(mask, angle, Image.NEAREST, self.rotation.expand, self.rotation.center)
             segment = F.rotate(segment, angle, Image.NEAREST, self.rotation.expand, self.rotation.center)
             if target_is_image:
-                target = F.rotate(target, angle, Image.NEAREST, self.rotation.expand, self.rotation.center)
+                for ii in range(len(target)):
+                    target[ii] = F.rotate(target[ii], angle, Image.NEAREST, self.rotation.expand, self.rotation.center)
 
         # apply RRC
         if self.random_resize_crop is not None:
@@ -80,7 +81,8 @@ class DataAugmentation():
             mask = F.resized_crop(mask, i, j, h, w, self.random_resize_crop.size, Image.NEAREST)
             segment = F.resized_crop(segment, i, j, h, w, self.random_resize_crop.size, Image.NEAREST)
             if target_is_image:
-                target = F.resized_crop(target, i, j, h, w, self.random_resize_crop.size, Image.NEAREST)
+                for ii in range(len(target)):
+                    target[ii] = F.resized_crop(target[ii], i, j, h, w, self.random_resize_crop.size, Image.NEAREST)
 
         if self.hflip is not None:
             if random.random() < self.hflip:
@@ -88,7 +90,8 @@ class DataAugmentation():
                 mask = F.hflip(mask)
                 segment = F.hflip(segment)
                 if target_is_image:
-                    target = F.hflip(target)
+                    for ii in range(len(target)):
+                        target[ii] = F.hflip(target[ii])
 
         if self.vflip is not None:
             if random.random() < self.hflip:
@@ -96,7 +99,8 @@ class DataAugmentation():
                 mask = F.vflip(mask)
                 segment = F.vflip(segment)
                 if target_is_image:
-                    target = F.vflip(target)
+                    for ii in range(len(target)):
+                        target[ii] = F.vflip(target[ii])
 
         return (sample, mask, segment), target
 
@@ -126,7 +130,7 @@ class DataPreparation():
 
     def apply(self, source, target):
         sample, mask, segment = source
-        target_is_image = isinstance(target, Image.Image)
+        target_is_image = isinstance(target[0], Image.Image)
 
         if self.size is not None:
             sample = F.resize(sample, self.size, interpolation=Image.BILINEAR)
@@ -135,7 +139,8 @@ class DataPreparation():
             if segment is not None:
                 segment = F.resize(segment, self.size, interpolation=Image.NEAREST)
             if target_is_image:
-                target = F.resize(target, self.size, interpolation=Image.NEAREST)
+                for ii in range(len(target)):
+                    target[ii] = F.resize(target[ii], self.size, interpolation=Image.NEAREST)
 
         if self.crop is not None:
             sample = F.center_crop(sample, self.size)
@@ -144,7 +149,8 @@ class DataPreparation():
             if segment is not None:
                 segment = F.center_crop(segment, self.size)
             if target_is_image:
-                target = F.center_crop(target, self.size)
+                for ii in range(len(target)):
+                    target[ii] = F.center_crop(target[ii], self.size)
 
         sample = self.transform(sample)
         if mask is not None:
@@ -152,7 +158,9 @@ class DataPreparation():
         if segment is not None:
             segment = self.transform(segment)
         if target_is_image:
-            target = self.transform(target)
+            for ii in range(len(target)):
+                target[ii] = self.transform(target[ii])
+            target = torch.cat(target, dim=0)
 
         if self.mean is not None and self.std is not None:
             sample = transforms.functional.normalize(sample, self.mean, self.std)
@@ -219,7 +227,23 @@ class TripleDataset(torch.utils.data.Dataset):
 
         # special treatment if target is class labels vs. filename
         if isinstance(target, str):
-            target = self.loader(target).convert('L')
+            target = self.loader(target)
+            if len(target.getbands()) > 1:
+                targets = []
+                for band in target.getbands():
+                    channel = target.getchannel(band)
+                    if channel.histogram()[0] == np.prod(channel.size):
+                        continue
+                    targets.append(channel)
+                if len(targets) > 1:
+                    bg_mask = np.array(targets[0])
+                    for t in targets[1:]:
+                        bg_mask = np.clip(bg_mask + np.array(t), 0, 255)
+                    bg_mask = 255 - bg_mask
+                    bg_mask = Image.fromarray(bg_mask)
+                    target = [bg_mask, *targets]
+            else:
+                target = [target]
 
         source = (sample, mask, segment)
 

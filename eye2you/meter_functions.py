@@ -42,15 +42,15 @@ def segmentation_accuracy(predictions, targets):
             targets.shape, predictions.shape))
 
     n, c, h, w = predictions.shape
-    if c != 1:
-        raise ValueError('Only images with 1 channel supported')
+    #if c != 1:
+    #    raise ValueError('Only images with 1 channel supported')
 
     res = np.empty(n)
     for ii in range(n):
-        t = targets[ii, 0, :, :]
-        p = predictions[ii, 0, :, :]
+        t = targets[ii, :, :, :]
+        p = predictions[ii, :, :, :]
         correct = (t == p)
-        res[ii] = float(correct.sum()) / float(h * w)
+        res[ii] = float(correct.sum()) / float(h * w) / c
 
     return res
 
@@ -67,13 +67,13 @@ def segmentation_iou(predictions, targets):
             targets.shape, predictions.shape))
 
     n, c, h, w = predictions.shape
-    if c != 1:
-        raise ValueError('Only images with 1 channel supported')
+    #if c != 1:
+    #    raise ValueError('Only images with 1 channel supported')
 
     res = np.empty(n)
     for ii in range(n):
-        t = targets[ii, 0, :, :]
-        p = predictions[ii, 0, :, :]
+        t = targets[ii, :, :, :]
+        p = predictions[ii, :, :, :]
         intersection = np.logical_and(t, p)
         union = np.logical_or(t, p)
         res[ii] = float(intersection.sum()) / float(union.sum())
@@ -101,17 +101,17 @@ def segmentation_precision(predictions, targets):
             targets.shape, predictions.shape))
 
     n, c, h, w = predictions.shape
-    if c != 1:
-        raise ValueError('Only images with 1 channel supported')
+    #if c != 1:
+    #    raise ValueError('Only images with 1 channel supported')
 
     res = np.empty(n)
     for ii in range(n):
-        t = targets[ii, 0, :, :]
-        p = predictions[ii, 0, :, :]
+        t = targets[ii, :, :, :]
+        p = predictions[ii, :, :, :]
         correct = np.logical_and(t, p)
         correct_plus_false_positive = np.logical_or(correct, p)
         if float(correct_plus_false_positive.sum()) > 0:
-            res[ii] = float(correct.sum()) / float(correct_plus_false_positive.sum())
+            res[ii] = float(correct.sum()) / float(correct_plus_false_positive.sum()) / c
         else:
             res[ii] = 0.0
 
@@ -138,16 +138,16 @@ def segmentation_recall(predictions, targets):
             targets.shape, predictions.shape))
 
     n, c, h, w = predictions.shape
-    if c != 1:
-        raise ValueError('Only images with 1 channel supported')
+    #if c != 1:
+    #    raise ValueError('Only images with 1 channel supported')
 
     res = np.empty(n)
     for ii in range(n):
-        t = targets[ii, 0, :, :]
-        p = predictions[ii, 0, :, :]
+        t = targets[ii, :, :, :]
+        p = predictions[ii, :, :, :]
         correct = np.logical_and(t, p)
         if t.sum() > 0:
-            res[ii] = float(correct.sum()) / float(t.sum())
+            res[ii] = float(correct.sum()) / float(t.sum()) / c
         else:
             res[ii] = 0
 
@@ -174,16 +174,16 @@ def segmentation_specificity(predictions, targets):
             targets.shape, predictions.shape))
 
     n, c, h, w = predictions.shape
-    if c != 1:
-        raise ValueError('Only images with 1 channel supported')
+    #if c != 1:
+    #    raise ValueError('Only images with 1 channel supported')
 
     res = np.empty(n)
     for ii in range(n):
-        t = targets[ii, 0, :, :]
-        p = predictions[ii, 0, :, :]
+        t = targets[ii, :, :, :]
+        p = predictions[ii, :, :, :]
         correct = np.logical_and(1 - t, 1 - p)
         if float((1 - t).sum()) > 0:
-            res[ii] = float(correct.sum()) / float((1 - t).sum())
+            res[ii] = float(correct.sum()) / float((1 - t).sum()) / c
         else:
             res[ii] = 0
 
@@ -202,13 +202,13 @@ def segmentation_dice(predictions, targets):
             targets.shape, predictions.shape))
 
     n, c, h, w = predictions.shape
-    if c != 1:
-        raise ValueError('Only images with 1 channel supported')
+    #if c != 1:
+    #    raise ValueError('Only images with 1 channel supported')
 
     res = np.empty(n)
     for ii in range(n):
-        t = targets[ii, 0, :, :]
-        p = predictions[ii, 0, :, :]
+        t = targets[ii, :, :, :]
+        p = predictions[ii, :, :, :]
         intersection = np.logical_and(t, p)
         union = np.logical_or(t, p)
         res[ii] = float(2 * intersection.sum()) / float(union.sum() + intersection.sum())

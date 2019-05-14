@@ -16,13 +16,13 @@ IMG_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tif
 
 def pil_loader(path, mode='RGB'):
     """load an image using PIL/Pillow
-    
+
     Arguments:
         path {str} -- file name (and path)
-    
+
     Keyword Arguments:
         mode {str} -- Convert the image to given mode (default: {'RGB'})
-    
+
     Returns:
         PIL.Image.Image -- Converted PIL Image
     """
@@ -34,11 +34,11 @@ def pil_loader(path, mode='RGB'):
 def get_images(directory, extensions=IMG_EXTENSIONS):
     """retrieves all images from a given directory with
     the given extensions in alphabetical order
-    
+
     Arguments:
         directory {str} -- directory name
         extensions {list} -- List of allowed extensions (as string)
-    
+
     Returns:
         list -- list of image file names (including directory)
     """
@@ -65,14 +65,14 @@ def has_file_allowed_extension(filename, extensions):
 def float_to_uint8(img, min_val=None, max_val=None):
     """Convert floating point image to uint8 image setting 0 to min_val and
     255 to max_val. If either is None the min/max of the float image is taken.
-    
+
     Arguments:
         img {array} -- Numpy array or torch tensor
-    
+
     Keyword Arguments:
         min_val {float} -- minimum value set to 0 in uint8 format (default: {None})
         max_val {float} -- maximum value set to 255 in uint8 format (default: {None})
-    
+
     Returns:
         np.ndarray -- uint8 format array
     """
@@ -133,7 +133,7 @@ def torch_to_cv2(img):
         img {torch.Tensor} -- NCHW shaped with n=1 or CHW shaped torch tensor
 
     Returns:
-        [numpy.ndarray] -- PIL image in uint8 format
+        [numpy.ndarray] -- cv2 image in HWC format
     '''
     img = np.transpose(img.squeeze().numpy(), axes=(1, 2, 0))
     return img
@@ -201,13 +201,13 @@ def split_tensor_image_into_patches(img, patch_size):
 
 def merge_tensor_image_from_patches(patches, shape=None):
     """Assembles patches to an image
-    
+
     Arguments:
         patches {[type]} -- [description]
-    
+
     Keyword Arguments:
         shape {[type]} -- [description] (default: {None})
-    
+
     Returns:
         [type] -- [description]
     """

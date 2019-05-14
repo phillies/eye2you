@@ -318,30 +318,6 @@ class SingleAccuracyMeter(PerformanceMeter):
         return 'accuracy_class_{}'.format(self.index)
 
 
-class SegmentationMeter(PerformanceMeter):
-
-    def __init__(self):
-        self.results = []
-
-    def update(self, output, target):
-        res = segmentation_all(output.round().detach().cpu().numpy(), target.detach().cpu().numpy())
-        self.results.append(res)
-        return self.value()
-
-    def value(self):
-        val = np.concatenate(self.results, axis=1).mean(1)
-        return val
-
-    def reset(self):
-        self.results = []
-
-    def __repr__(self):
-        return 'SegmentationMeter()'
-
-    def __str__(self):
-        return ('accuracy', 'precicion', 'recall', 'specificity', 'iou', 'dice')
-
-
 class SegmentationAccuracyMeter(PerformanceMeter):
 
     def __init__(self):
@@ -353,7 +329,7 @@ class SegmentationAccuracyMeter(PerformanceMeter):
         return self.value()
 
     def value(self):
-        val = np.array(self.results).mean()
+        val = np.concatenate(self.results).mean()
         return val
 
     def reset(self):
@@ -377,7 +353,7 @@ class SegmentationPrecisionMeter(PerformanceMeter):
         return self.value()
 
     def value(self):
-        val = np.array(self.results).mean()
+        val = np.concatenate(self.results).mean()
         return val
 
     def reset(self):
@@ -401,7 +377,7 @@ class SegmentationRecallMeter(PerformanceMeter):
         return self.value()
 
     def value(self):
-        val = np.array(self.results).mean()
+        val = np.concatenate(self.results).mean()
         return val
 
     def reset(self):
@@ -425,7 +401,7 @@ class SegmentationSpecificityMeter(PerformanceMeter):
         return self.value()
 
     def value(self):
-        val = np.array(self.results).mean()
+        val = np.concatenate(self.results).mean()
         return val
 
     def reset(self):
@@ -449,7 +425,7 @@ class SegmentationIOUMeter(PerformanceMeter):
         return self.value()
 
     def value(self):
-        val = np.array(self.results).mean()
+        val = np.concatenate(self.results).mean()
         return val
 
     def reset(self):
@@ -473,7 +449,7 @@ class SegmentationDiceMeter(PerformanceMeter):
         return self.value()
 
     def value(self):
-        val = np.array(self.results).mean()
+        val = np.concatenate(self.results).mean()
         return val
 
     def reset(self):

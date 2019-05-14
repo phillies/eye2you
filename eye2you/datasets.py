@@ -126,7 +126,7 @@ class DataPreparation():
         self.std = std
         self.size = size
         self.crop = crop
-        self.transform = transforms.ToTensor()
+        self.convert = transforms.ToTensor()
 
     def apply(self, source, target):
         sample, mask, segment = source
@@ -152,14 +152,14 @@ class DataPreparation():
                 for ii in range(len(target)):
                     target[ii] = F.center_crop(target[ii], self.size)
 
-        sample = self.transform(sample)
+        sample = self.convert(sample)
         if mask is not None:
-            mask = self.transform(mask)
+            mask = self.convert(mask)
         if segment is not None:
-            segment = self.transform(segment)
+            segment = self.convert(segment)
         if target_is_image:
             for ii in range(len(target)):
-                target[ii] = self.transform(target[ii])
+                target[ii] = self.convert(target[ii])
             target = torch.cat(target, dim=0)
 
         if self.mean is not None and self.std is not None:
@@ -173,10 +173,14 @@ class DataPreparation():
             trans.append(transforms.Resize(self.size))
         if self.crop is not None:
             trans.append(transforms.CenterCrop(self.crop))
-        trans.append(self.transform)
+        trans.append(self.convert)
         if self.mean is not None and self.std is not None:
             trans.append(transforms.Normalize(self.mean, self.std))
         return transforms.Compose(trans)
+
+    @property
+    def transform(self):
+        return self.get_transform()
 
     def __str__(self):
         return 'Preparation:\n' + str(self.get_transform())

@@ -1,0 +1,5 @@
+filename,mask,segmentation,target
+classA/img0.jpg,classA/img0_mask.png,classA/img0_mask.png,classA/img0_mask.png
+classA/img1.jpg,classA/img1_mask.png,classA/img1_mask.png,classA/img1_mask.png
+classB/img2.jpg,classB/img2_mask.png,classB/img2_mask.png,classB/img2_mask.png
+classB/img3.jpg,classB/img3_mask.png,classB/img3_mask.png,classB/img3_mask.png

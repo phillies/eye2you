@@ -59,8 +59,8 @@ class Network():
             criterion_kwargs = dict()
         if optimizer_kwargs is None:
             optimizer_kwargs = dict()
-        if scheduler_kwargs is None:
-            scheduler_kwargs = dict()
+        if use_scheduler and (scheduler_kwargs is None or 'step_size' not in scheduler_kwargs):
+            raise ValueError('scheduler_kwarg["step_size"] must be set if use_scheduler=True')
         self.initialize_model(**model_kwargs)
         self.initialize_criterion(**criterion_kwargs)
         self.initialize_optimizer(optimizer_kwargs=optimizer_kwargs,
@@ -100,7 +100,7 @@ class Network():
         if self.optimizer_name in torch.optim.__dict__.keys():
             optimizer_loader = torch.optim.__dict__[self.optimizer_name]
         else:
-            warnings.warn('Could not identify optimizer')
+            warnings.warn(f'Could not identify optimizer {self.optimizer_name}')
             return
 
         self.optimizer = optimizer_loader(self.model.parameters(), **optimizer_kwargs)
@@ -108,8 +108,8 @@ class Network():
             self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, **scheduler_kwargs)
 
     def train(self, loader, position=None):
-        if self.optimizer is None:
-            raise ValueError('No optimizer defined. Cannot run training.')
+        if self.optimizer is None or self.criterion is None:
+            raise ValueError('No optimizer and/or criterion defined. Cannot run training.')
         self.model.train()
         if self.scheduler is not None:
             self.scheduler.step()
@@ -131,14 +131,13 @@ class Network():
 
             outputs = self.model(*source)
 
-            if self.criterion is not None:
-                if isinstance(outputs, tuple):
-                    #TODO: Check if the division by length of outputs make a notable difference
-                    loss = sum((self.criterion(o, target) for o in outputs))
-                    total_loss += loss.item() * target.shape[0] / len(outputs)
-                else:
-                    loss = self.criterion(outputs, target)
-                    total_loss += loss.item() * target.shape[0]
+            if isinstance(outputs, tuple):
+                #TODO: Check if the division by length of outputs make a notable difference
+                loss = sum((self.criterion(o, target) for o in outputs))
+                total_loss += loss.item() * target.shape[0] / len(outputs)
+            else:
+                loss = self.criterion(outputs, target)
+                total_loss += loss.item() * target.shape[0]
             for perf_meter in self.performance_meters:
                 if isinstance(outputs, tuple):
                     perf_meter.update(outputs[0], target)
@@ -222,13 +221,6 @@ class Network():
             optimizer_name = None
             optimizer_kwargs = None
 
-        if 'criterion' in state_dict:
-            criterion_name = state_dict['criterion_name']
-            criterion_kwargs = state_dict['criterion_kwargs']
-        else:
-            criterion_name = None
-            criterion_kwargs = None
-
         if 'scheduler' in state_dict:
             use_scheduler = True
             scheduler_kwargs = state_dict['scheduler_kwargs']
@@ -238,11 +230,11 @@ class Network():
 
         net = Network(device=device,
                       model_name=state_dict['model_name'],
-                      criterion_name=criterion_name,
+                      criterion_name=state_dict['criterion_name'],
                       optimizer_name=optimizer_name,
                       performance_meters=state_dict['performance_meters'],
                       model_kwargs=state_dict['model_kwargs'],
-                      criterion_kwargs=criterion_kwargs,
+                      criterion_kwargs=state_dict['criterion_kwargs'],
                       optimizer_kwargs=optimizer_kwargs,
                       use_scheduler=use_scheduler,
                       scheduler_kwargs=scheduler_kwargs)
@@ -257,9 +249,9 @@ class Network():
     def __str__(self):
         res = ''
         sep = '\n'
-        res = res + self.model_name + str(self.model) + sep
-        res = res + self.criterion_name + sep + str(self.criterion) + sep
-        res = res + self.optimizer_name + sep + str(self.optimizer) + sep
+        res = res + str(self.model_name) + str(self.model) + sep
+        res = res + str(self.criterion_name) + sep + str(self.criterion) + sep
+        res = res + str(self.optimizer_name) + sep + str(self.optimizer) + sep
         res = res + str(self.performance_meters) + sep
-        res = res + str(self.scheduler)
+        res = res + str(self.scheduler.__class__)
         return res

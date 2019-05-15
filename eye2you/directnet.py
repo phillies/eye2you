@@ -114,46 +114,46 @@ class Basic2d(nn.Module):
         return x
 
 
-class SpatialSeparable2d(nn.Module):
-    '''Basic 2D convolution block with 2 consecutive 2D convolutions with
-    batch normalization and reLU activation after each convolution
-    '''
+# class SpatialSeparable2d(nn.Module):
+#     '''Basic 2D convolution block with 2 consecutive 2D convolutions with
+#     batch normalization and reLU activation after each convolution
+#     '''
 
-    def __init__(self,
-                 in_channels,
-                 out_channels,
-                 kernel_size=3,
-                 padding=1,
-                 stride=1,
-                 bias=False,
-                 momentum=0.1,
-                 relu=True):
-        super().__init__()
-        self.convH = nn.Conv2d(in_channels=in_channels,
-                               out_channels=out_channels,
-                               kernel_size=(kernel_size, 1),
-                               padding=(padding, 0),
-                               stride=stride,
-                               bias=bias)
-        self.convW = nn.Conv2d(in_channels=in_channels,
-                               out_channels=out_channels,
-                               kernel_size=(1, kernel_size),
-                               padding=(0, padding),
-                               stride=stride,
-                               bias=bias)
-        self.bn = nn.BatchNorm2d(out_channels, momentum=momentum)
-        if relu:
-            self.relu = nn.ReLU(inplace=True)
-        else:
-            self.relu = None
+#     def __init__(self,
+#                  in_channels,
+#                  out_channels,
+#                  kernel_size=3,
+#                  padding=1,
+#                  stride=1,
+#                  bias=False,
+#                  momentum=0.1,
+#                  relu=True):
+#         super().__init__()
+#         self.convH = nn.Conv2d(in_channels=in_channels,
+#                                out_channels=out_channels,
+#                                kernel_size=(kernel_size, 1),
+#                                padding=(padding, 0),
+#                                stride=stride,
+#                                bias=bias)
+#         self.convW = nn.Conv2d(in_channels=in_channels,
+#                                out_channels=out_channels,
+#                                kernel_size=(1, kernel_size),
+#                                padding=(0, padding),
+#                                stride=stride,
+#                                bias=bias)
+#         self.bn = nn.BatchNorm2d(out_channels, momentum=momentum)
+#         if relu:
+#             self.relu = nn.ReLU(inplace=True)
+#         else:
+#             self.relu = None
 
-    def forward(self, x):
-        x = self.convH(x)
-        x = self.convW(x)
-        x = self.bn(x)
-        if self.relu is not None:
-            x = self.relu(x)
-        return x
+#     def forward(self, x):
+#         x = self.convH(x)
+#         x = self.convW(x)
+#         x = self.bn(x)
+#         if self.relu is not None:
+#             x = self.relu(x)
+#         return x
 
 
 class DepthSeparable2d(nn.Module):

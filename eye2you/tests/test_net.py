@@ -8,272 +8,248 @@ import pytest
 import torch
 
 import eye2you
-import eye2you.make_default_config
-from eye2you import RetinaChecker
+from eye2you import factory
+import yaml
+
+from eye2you.meter_functions import TotalAccuracyMeter
+
+LOCAL_DIR = pathlib.Path(os.path.dirname(os.path.realpath(__file__)))
 
 
-def test_create_checker(tmp_path, example_config):
-    # Reading configuration file
-    config = configparser.ConfigParser()
-    config.read_string(example_config)
+def test_net_setup():
+    config = yaml.full_load('''
+    device: cpu
+    model_name: inception_v3_xs
+    model_kwargs:
+    criterion_name: BCEWithLogitsLoss
+    criterion_kwargs:
+    optimizer_name: Adam
+    optimizer_kwargs:
+    use_scheduler: True
+    scheduler_kwargs:
+        step_size: 5
+    performance_meters:
+    ''')
 
-    # create the checker class and initialize internal variables
-    rc = RetinaChecker()
-    assert not rc.initialized
-    assert str(rc).count('not initialized') > 0
+    net = eye2you.net.Network(**config)
+    assert net is not None
+    assert net.model is not None
+    assert net.optimizer is not None
+    assert net.criterion is not None
+    assert net.scheduler is not None
 
-    rc.initialize(config)
+    config = yaml.full_load('''
+    device: cpu
+    model_name: inception_v3_xs
+    model_kwargs:
+        num_classes: 7
+    criterion_name: BCEWithLogitsLoss
+    criterion_kwargs:
+    optimizer_name: Adam
+    optimizer_kwargs:
+        lr: 0.001
+    use_scheduler: True
+    scheduler_kwargs:
+        step_size: 10
+        gamma: 0.25
+    performance_meters:
+        - mf.TotalAccuracyMeter()
+        - mf.SingleAccuracyMeter(5)
+    ''')
 
-    assert rc.initialized
-    assert str(rc).count('not initialized') == 0
-
-    # Initialize the model
-    rc.initialize_model()
-    rc.initialize_criterion()
-    rc.initialize_optimizer()
-
-    assert not rc.model is None
-    assert not rc.criterion is None
-    assert not rc.optimizer is None
-
-    rc.save_state(tmp_path / 'tmpmodel.ckpt')
-
-    assert os.path.isfile(tmp_path / 'tmpmodel.ckpt')
-
-    del rc
-    torch.cuda.empty_cache()
-
-
-def test_create_checker_s(tmp_path, example_config):
-    # Reading configuration file
-    config = configparser.ConfigParser()
-    config.read_string(example_config)
-    config['network']['model'] = 'inception_v3_s'
-
-    # create the checker class and initialize internal variables
-    rc = RetinaChecker()
-    assert not rc.initialized
-    assert str(rc).count('not initialized') > 0
-
-    rc.initialize(config)
-
-    assert rc.initialized
-    assert str(rc).count('not initialized') == 0
-
-    # Initialize the model
-    rc.initialize_model()
-    rc.initialize_criterion()
-    rc.initialize_optimizer()
-
-    assert not rc.model is None
-    assert not rc.criterion is None
-    assert not rc.optimizer is None
-
-    del rc
-    torch.cuda.empty_cache()
+    net = eye2you.net.Network(**config)
+    assert net is not None
 
 
-def test_create_checker_xs(tmp_path, example_config):
-    # Reading configuration file
-    config = configparser.ConfigParser()
-    config.read_string(example_config)
-    config['network']['model'] = 'inception_v3_xs'
+def test_network_warning_false_names():
+    config = yaml.full_load('''
+    device: cpu
+    model_name: 
+    model_kwargs:
+    criterion_name: 
+    criterion_kwargs:
+    optimizer_name: 
+    optimizer_kwargs:
+    use_scheduler: False
+    scheduler_kwargs:
+    performance_meters:
+    ''')
 
-    # create the checker class and initialize internal variables
-    rc = RetinaChecker()
-    assert not rc.initialized
-    assert str(rc).count('not initialized') > 0
+    with pytest.warns(Warning):
+        _ = eye2you.net.Network(**config)
 
-    rc.initialize(config)
+    config = yaml.full_load('''
+    device: cpu
+    model_name: inception_v3_xs
+    model_kwargs:
+    criterion_name: test
+    criterion_kwargs:
+    optimizer_name: test
+    optimizer_kwargs:
+    use_scheduler: False
+    scheduler_kwargs:
+    performance_meters:
+    ''')
 
-    assert rc.initialized
-    assert str(rc).count('not initialized') == 0
+    with pytest.warns(Warning):
+        _ = eye2you.net.Network(**config)
 
-    # Initialize the model
-    rc.initialize_model()
-    rc.initialize_criterion()
-    rc.initialize_optimizer()
+    config = yaml.full_load('''
+    device: cpu
+    model_name: inception_v3_xs
+    model_kwargs:
+    criterion_name: L1Loss
+    criterion_kwargs:
+    optimizer_name: test
+    optimizer_kwargs:
+    use_scheduler: False
+    scheduler_kwargs:
+    performance_meters:
+    ''')
 
-    assert not rc.model is None
-    assert not rc.criterion is None
-    assert not rc.optimizer is None
+    with pytest.warns(Warning):
+        _ = eye2you.net.Network(**config)
 
-    del rc
-    torch.cuda.empty_cache()
+    config = yaml.full_load('''
+    device: cpu
+    model_name: inception_v3_xs
+    model_kwargs:
+    criterion_name: L1Loss
+    criterion_kwargs:
+    optimizer_name: Adam
+    optimizer_kwargs:
+    use_scheduler: True
+    scheduler_kwargs:
+    performance_meters:
+    ''')
 
-
-def test_loading_data():
-    #assert False #TODO: implement me
-    pass
-
-
-def test_creating_dataloader():
-    #assert False #TODO: implement me
-    pass
-
-
-def test_reloading():
-    #assert False #TODO: implement me
-    pass
-
-
-def test_load_data_split():
-    #assert False #TODO: implement me
-    pass
-
-
-def test_train_and_validation():
-    cfg = '''[network]
-    model = inception_v3_s
-
-    [hyperparameter]
-    batch size = 16
-
-    [files]
-    train file = {localdir}/data.csv
-    train root = {localdir}/data/
-    test file = {localdir}/data.csv
-    test root = {localdir}/data/
-    samples = 32
-
-    [transform]
-    [output]
-    [input]'''.format(localdir=pathlib.Path(os.path.dirname(os.path.realpath(__file__))))
-
-    # Reading configuration file
-    config = configparser.ConfigParser()
-    config.read_string(cfg)
-
-    # create the checker class and initialize internal variables
-    rc = RetinaChecker()
-    rc.initialize(config)
-
-    # Loading data sets based on configuration and enable normaization
-    rc.load_datasets()
-
-    # Initializing sampler and data (=patch) loader
-    rc.create_dataloader()
-
-    # Initialize the model
-    rc.initialize_model()
-    rc.initialize_criterion()
-    rc.initialize_optimizer()
-
-    # Performance meters initalized (either empty or from file)
-    #num_epochs = rc.start_epoch + config['hyperparameter'].getint('epochs', 2)
-
-    # Starting training & evaluation
-    #for epoch in range(rc.start_epoch, num_epochs):
-
-    # Train the model and record training loss & accuracy
-    losses, accuracy = rc.train()
-    assert losses is not None
-    assert accuracy is not None
-
-    # Validation
-    losses, accuracy, confusion = rc.validate()
-    assert losses is not None
-    assert accuracy is not None
-    assert confusion is not None
-
-    del rc
-    torch.cuda.empty_cache()
-
-
-def test_printing(retina_checker):
-    # Pretrained
-    # with dataset and workers
-    #assert False #TODO: implement me
-    print(retina_checker)
-    retina_checker.train()
-    retina_checker.validate()
-
-
-def test_printing_s(retina_checker_s):
-    print(retina_checker_s)
-    retina_checker_s.train()
-    retina_checker_s.validate()
-
-
-def test_printing_xs(retina_checker_xs):
-    print(retina_checker_xs)
-    retina_checker_xs.train()
-    retina_checker_xs.validate()
-
-
-def test_initialize_unknown_config():
-    #String but no config or checkpoint
-    #not string not config
-    #assert False #TODO: implement me
-    pass
-
-
-def test_loading(checkpoint_file):
-    # with an without filename (filename in config->inpit->checkpoint)
-    # with optimizer not None
-    # with scheduler in checkoiunt and not
-    #assert False #TODO: implement me
-    pass
-
-
-def test_parse_config(checkpoint_file):
-    rc = RetinaChecker()
-    assert rc.config is None
     with pytest.raises(ValueError):
-        rc._parse_config()
-
-    config = eye2you.make_default_config.get_config()
-    rc.initialize(config)
-    rc.initialize_model()
-    rc.initialize_criterion()
-    rc.initialize_optimizer()
-    rc.split_indices = ([1, 2, 3], [4, 5, 6])
-
-    rc.save_state(checkpoint_file)
-    del rc
-    torch.cuda.empty_cache()
+        _ = eye2you.net.Network(**config)
 
 
-def test_warning_unknown_names():
-    rc = RetinaChecker()
-    config = eye2you.make_default_config.get_config()
-    rc.initialize(config)
+def test_network_train():
+    config = factory.config_from_yaml(LOCAL_DIR / 'data/example.yaml')
+    config['dataset']['csv'] = str(LOCAL_DIR / config['dataset']['csv'])
+    config['dataset']['root'] = str(LOCAL_DIR / config['dataset']['root'])
+    config['dataset']['validation']['csv'] = config['dataset']['csv']
+    config['dataset']['validation']['root'] = config['dataset']['root']
 
-    rc.model_name = None
-    rc.optimizer_name = None
-    rc.criterion_name = None
+    dataprep = eye2you.datasets.DataPreparation(**config['data_preparation'])
+    train_data, _ = factory.data_from_config(config['dataset'])
+    train_data.preparation = dataprep
+    train_loader = factory.get_loader(config['training'], train_data)
+    net = eye2you.net.Network(**config['net'])
+    assert net is not None
 
-    with pytest.warns(Warning):
-        rc.initialize_model()
-    with pytest.warns(Warning):
-        rc.initialize_criterion()
-    with pytest.warns(Warning):
-        rc.initialize_optimizer()
-    del rc
-    torch.cuda.empty_cache()
+    net.train(train_loader)
+
+    config['net']['model_name'] = 'inception_v3_s'
+    net = eye2you.net.Network(**config['net'])
+    assert net is not None
+
+    net.train(train_loader)
 
 
-def test_device_initialization(example_config):
-    # Reading configuration file
-    config = configparser.ConfigParser()
-    config.read_string(example_config)
-    config['network']['model'] = 'inception_v3_xs'
-    config['network'].pop('device', None)
+def test_network_train_value_error():
+    config = factory.config_from_yaml(LOCAL_DIR / 'data/example.yaml')
+    config['dataset']['csv'] = str(LOCAL_DIR / config['dataset']['csv'])
+    config['dataset']['root'] = str(LOCAL_DIR / config['dataset']['root'])
+    config['dataset']['validation']['csv'] = config['dataset']['csv']
+    config['dataset']['validation']['root'] = config['dataset']['root']
 
-    # create the checker class and initialize internal variables
-    rc = RetinaChecker()
-    rc.initialize(config)
+    dataprep = eye2you.datasets.DataPreparation(**config['data_preparation'])
+    train_data, _ = factory.data_from_config(config['dataset'])
+    train_data.preparation = dataprep
+    train_loader = factory.get_loader(config['training'], train_data)
+    net = eye2you.net.Network(**config['net'])
+    optimizer = net.optimizer
+    net.optimizer = None
+    assert net is not None
 
-    assert not rc.device == 'test'
+    with pytest.raises(ValueError):
+        net.train(train_loader)
 
-    del rc
-    torch.cuda.empty_cache()
+    net.optimizer = optimizer
+    net.criterion = None
+    with pytest.raises(ValueError):
+        net.train(train_loader)
 
-    config['network']['device'] = 'test'
-    rc = RetinaChecker()
-    rc.initialize(config)
 
-    assert rc.device == 'test'
+def test_network_validate():
+    config = factory.config_from_yaml(LOCAL_DIR / 'data/example.yaml')
+    config['dataset']['csv'] = str(LOCAL_DIR / config['dataset']['csv'])
+    config['dataset']['root'] = str(LOCAL_DIR / config['dataset']['root'])
+    config['dataset']['validation']['csv'] = config['dataset']['csv']
+    config['dataset']['validation']['root'] = config['dataset']['root']
 
-    del rc
-    torch.cuda.empty_cache()
+    dataprep = eye2you.datasets.DataPreparation(**config['data_preparation'])
+
+    _, validate_data = factory.data_from_config(config['dataset'])
+
+    validate_data.preparation = dataprep
+
+    validate_loader = factory.get_loader(config['validation'], validate_data)
+
+    net = eye2you.net.Network(**config['net'])
+
+    net.validate(validate_loader)
+
+
+def test_from_and_to_state_dict():
+    config = factory.config_from_yaml(LOCAL_DIR / 'data/example.yaml')
+    net1 = eye2you.net.Network(**config['net'])
+
+    net_before = str(net1)
+
+    state_dict = net1.get_state_dict()
+    state_dict['performance_meters'] = [
+        p if not isinstance(p, str) else eval(p) for p in state_dict['performance_meters']
+    ]
+
+    net2 = eye2you.net.Network.from_state_dict(state_dict)
+
+    net_after = str(net2)
+    assert net_before == net_after
+    assert compare_network_weights(net1, net2)
+
+
+def test_load_state_dict():
+    config = factory.config_from_yaml(LOCAL_DIR / 'data/example.yaml')
+    net1 = eye2you.net.Network(**config['net'])
+    state_dict = net1.get_state_dict()
+
+    net2 = eye2you.net.Network(**config['net'])
+    net2.load_state_dict(state_dict)
+
+    assert compare_network_weights(net1, net2)
+
+
+def compare_network_weights(net1, net2):
+    par1 = list(net1.model.parameters())
+    par2 = list(net2.model.parameters())
+
+    for p1, p2 in zip(par1, par2):
+        assert p1.allclose(p2)
+
+    pg1 = net1.optimizer.param_groups
+    pg2 = net2.optimizer.param_groups
+
+    for par1, par2 in zip(pg1, pg2):
+        assert sorted(par1.keys()) == sorted(par2.keys())
+        for key in par1.keys():
+            if isinstance(par1[key], (list, tuple)):
+                for p1, p2 in zip(par1[key], par2[key]):
+                    if hasattr(p1, 'allclose'):
+                        assert p1.allclose(p2)
+                    else:
+                        assert p1 == p2
+            elif isinstance(par1[key], torch.nn.parameter.Parameter):
+                assert par1[key].allclose(par2[key])
+            else:
+                assert par1[key] == par2[key]
+
+    return True
+
+
+def test_network_print():
+    pass

@@ -1,25 +1,23 @@
 import torch.nn as nn
 import numpy as np
 
+# def single_output_performance(labels, outputs, feature_number=5):
+#     if isinstance(outputs, tuple):
+#         predicted = nn.Sigmoid()(outputs[0])
+#     else:
+#         predicted = nn.Sigmoid()(outputs)
+#     perf2 = (predicted[:, feature_number].round() == labels[:, feature_number])
+#     num_correct = float(perf2.sum())
+#     return num_correct
 
-def single_output_performance(labels, outputs, feature_number=5):
-    if isinstance(outputs, tuple):
-        predicted = nn.Sigmoid()(outputs[0])
-    else:
-        predicted = nn.Sigmoid()(outputs)
-    perf2 = (predicted[:, feature_number].round() == labels[:, feature_number])
-    num_correct = float(perf2.sum())
-    return num_correct
-
-
-def all_or_nothing_performance(labels, outputs):
-    if isinstance(outputs, tuple):
-        predicted = nn.Sigmoid()(outputs[0])
-    else:
-        predicted = nn.Sigmoid()(outputs)
-    perf = (predicted.round() == labels).sum(1) == labels.size()[1]
-    num_correct = float(perf.sum())
-    return num_correct
+# def all_or_nothing_performance(labels, outputs):
+#     if isinstance(outputs, tuple):
+#         predicted = nn.Sigmoid()(outputs[0])
+#     else:
+#         predicted = nn.Sigmoid()(outputs)
+#     perf = (predicted.round() == labels).sum(1) == labels.size()[1]
+#     num_correct = float(perf.sum())
+#     return num_correct
 
 
 def segmentation_accuracy(predictions, targets):
@@ -45,12 +43,13 @@ def segmentation_accuracy(predictions, targets):
     #if c != 1:
     #    raise ValueError('Only images with 1 channel supported')
 
-    res = np.empty(n)
-    for ii in range(n):
-        t = targets[ii, :, :, :]
-        p = predictions[ii, :, :, :]
-        correct = (t == p)
-        res[ii] = float(correct.sum()) / float(h * w) / c
+    P = (targets == 1).reshape(n, -1).sum(1)
+    N = (targets == 0).reshape(n, -1).sum(1)
+    TN = ((targets == 0) * (predictions == 0)).reshape(n, -1).sum(1)
+    TP = ((targets == 1) * (predictions == 1)).reshape(n, -1).sum(1)
+    #FP = ((targets == 0) * (predictions == 1)).reshape(n, -1).sum(1)
+    #FN = ((targets == 1) * (predictions == 0)).reshape(n, -1).sum(1)
+    res = (TP + TN) / (P + N)
 
     return res
 
@@ -70,13 +69,10 @@ def segmentation_iou(predictions, targets):
     #if c != 1:
     #    raise ValueError('Only images with 1 channel supported')
 
-    res = np.empty(n)
-    for ii in range(n):
-        t = targets[ii, :, :, :]
-        p = predictions[ii, :, :, :]
-        intersection = np.logical_and(t, p)
-        union = np.logical_or(t, p)
-        res[ii] = float(intersection.sum()) / float(union.sum())
+    P = (targets == 1).reshape(n, -1).sum(1)
+    TP = ((targets == 1) * (predictions == 1)).reshape(n, -1).sum(1)
+    FP = ((targets == 0) * (predictions == 1)).reshape(n, -1).sum(1)
+    res = TP / (P + FP)
 
     return res
 
@@ -104,16 +100,9 @@ def segmentation_precision(predictions, targets):
     #if c != 1:
     #    raise ValueError('Only images with 1 channel supported')
 
-    res = np.empty(n)
-    for ii in range(n):
-        t = targets[ii, :, :, :]
-        p = predictions[ii, :, :, :]
-        correct = np.logical_and(t, p)
-        correct_plus_false_positive = np.logical_or(correct, p)
-        if float(correct_plus_false_positive.sum()) > 0:
-            res[ii] = float(correct.sum()) / float(correct_plus_false_positive.sum()) / c
-        else:
-            res[ii] = 0.0
+    TP = ((targets == 1) * (predictions == 1)).reshape(n, -1).sum(1)
+    FP = ((targets == 0) * (predictions == 1)).reshape(n, -1).sum(1)
+    res = TP / (TP + FP)
 
     return res
 
@@ -141,15 +130,9 @@ def segmentation_recall(predictions, targets):
     #if c != 1:
     #    raise ValueError('Only images with 1 channel supported')
 
-    res = np.empty(n)
-    for ii in range(n):
-        t = targets[ii, :, :, :]
-        p = predictions[ii, :, :, :]
-        correct = np.logical_and(t, p)
-        if t.sum() > 0:
-            res[ii] = float(correct.sum()) / float(t.sum()) / c
-        else:
-            res[ii] = 0
+    TP = ((targets == 1) * (predictions == 1)).reshape(n, -1).sum(1)
+    FN = ((targets == 1) * (predictions == 0)).reshape(n, -1).sum(1)
+    res = TP / (TP + FN)
 
     return res
 
@@ -177,15 +160,9 @@ def segmentation_specificity(predictions, targets):
     #if c != 1:
     #    raise ValueError('Only images with 1 channel supported')
 
-    res = np.empty(n)
-    for ii in range(n):
-        t = targets[ii, :, :, :]
-        p = predictions[ii, :, :, :]
-        correct = np.logical_and(1 - t, 1 - p)
-        if float((1 - t).sum()) > 0:
-            res[ii] = float(correct.sum()) / float((1 - t).sum()) / c
-        else:
-            res[ii] = 0
+    TN = ((targets == 0) * (predictions == 0)).reshape(n, -1).sum(1)
+    FP = ((targets == 0) * (predictions == 1)).reshape(n, -1).sum(1)
+    res = TN / (TN + FP)
 
     return res
 
@@ -205,13 +182,10 @@ def segmentation_dice(predictions, targets):
     #if c != 1:
     #    raise ValueError('Only images with 1 channel supported')
 
-    res = np.empty(n)
-    for ii in range(n):
-        t = targets[ii, :, :, :]
-        p = predictions[ii, :, :, :]
-        intersection = np.logical_and(t, p)
-        union = np.logical_or(t, p)
-        res[ii] = float(2 * intersection.sum()) / float(union.sum() + intersection.sum())
+    TP = ((targets == 1) * (predictions == 1)).reshape(n, -1).sum(1)
+    FP = ((targets == 0) * (predictions == 1)).reshape(n, -1).sum(1)
+    FN = ((targets == 1) * (predictions == 0)).reshape(n, -1).sum(1)
+    res = 2 * TP / (2 * TP + FN + FP)
 
     return res
 
@@ -329,6 +303,8 @@ class SegmentationAccuracyMeter(PerformanceMeter):
         return self.value()
 
     def value(self):
+        if len(self.results) == 0:
+            return 0
         val = np.concatenate(self.results).mean()
         return val
 
@@ -353,6 +329,8 @@ class SegmentationPrecisionMeter(PerformanceMeter):
         return self.value()
 
     def value(self):
+        if len(self.results) == 0:
+            return 0
         val = np.concatenate(self.results).mean()
         return val
 
@@ -377,6 +355,8 @@ class SegmentationRecallMeter(PerformanceMeter):
         return self.value()
 
     def value(self):
+        if len(self.results) == 0:
+            return 0
         val = np.concatenate(self.results).mean()
         return val
 
@@ -401,6 +381,8 @@ class SegmentationSpecificityMeter(PerformanceMeter):
         return self.value()
 
     def value(self):
+        if len(self.results) == 0:
+            return 0
         val = np.concatenate(self.results).mean()
         return val
 
@@ -425,6 +407,8 @@ class SegmentationIOUMeter(PerformanceMeter):
         return self.value()
 
     def value(self):
+        if len(self.results) == 0:
+            return 0
         val = np.concatenate(self.results).mean()
         return val
 
@@ -449,6 +433,8 @@ class SegmentationDiceMeter(PerformanceMeter):
         return self.value()
 
     def value(self):
+        if len(self.results) == 0:
+            return 0
         val = np.concatenate(self.results).mean()
         return val
 

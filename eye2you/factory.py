@@ -1,4 +1,3 @@
-import argparse
 import os
 
 import numpy as np
@@ -9,6 +8,7 @@ from sklearn.model_selection import StratifiedShuffleSplit, ShuffleSplit
 
 from . import datasets
 from . import meter_functions as mf
+import torchvision
 
 
 def config_from_yaml(filename):
@@ -30,7 +30,7 @@ def config_from_yaml(filename):
     return config
 
 
-def load_csv(filename, root, mask_column_name='mask', segmentation_column_name='segmentation'):
+def load_csv(filename, root, mask_column_name='mask', segmentation_column_name='segmentation', target_colum_names=None):
     df = pd.read_csv(filename, index_col=0)
     df = df.sort_index()
     samples = np.array([os.path.join(root, v) for v in df.index.values])
@@ -42,7 +42,10 @@ def load_csv(filename, root, mask_column_name='mask', segmentation_column_name='
         segmentations = np.array([os.path.join(root, v) for v in df[segmentation_column_name].values])
 
     cols = df.columns.drop([mask_column_name, segmentation_column_name], errors='ignore')
-    if cols.size == 1 and isinstance(df[cols].iloc[0].values[0], str):
+    if target_colum_names is not None:
+        cols = [c for c in cols if c in target_colum_names]
+
+    if len(cols) == 1 and isinstance(df[cols].iloc[0].values[0], str):
         targets = np.array([os.path.join(root, v[0]) for v in df[cols].values])
     else:
         targets = np.array(df[cols].values)
@@ -130,14 +133,14 @@ def get_loader(config, dataset, step=None):
     else:
         sampler = torch.utils.data.RandomSampler(dataset, replacement=replacement, num_samples=num_samples)
 
-    if step is not None and 'batch_size_increase' in  config and config['batch_size_increase'] is not None:
+    if step is not None and 'batch_size_increase' in config and config['batch_size_increase'] is not None:
         batch_size = config['batch_size'] + step * config['batch_size_increase']
     else:
         batch_size = config['batch_size']
 
     loader = torch.utils.data.DataLoader(dataset,
                                          batch_size=batch_size,
-                                         shuffle=config['shuffle'],
+                                         shuffle=False,
                                          drop_last=drop_last,
                                          num_workers=config['num_workers'],
                                          sampler=sampler)

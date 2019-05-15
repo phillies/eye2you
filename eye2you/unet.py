@@ -1,10 +1,8 @@
-import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 
-def u_net(in_channels=3, out_channels=2, depth=2, bias=False, final_layer='sigmoid', pretrained=False):
+def u_net(in_channels=3, out_channels=2, depth=2, final_layer='sigmoid'):
     UnetClass = None
     if depth == 1:
         UnetClass = Unet1
@@ -15,8 +13,6 @@ def u_net(in_channels=3, out_channels=2, depth=2, bias=False, final_layer='sigmo
     else:
         UnetClass = Unet4
     net = UnetClass(in_channels=in_channels, out_channels=out_channels, final_layer=final_layer)
-    if pretrained:
-        pass
     return net
 
 

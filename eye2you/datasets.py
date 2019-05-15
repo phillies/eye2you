@@ -1,4 +1,5 @@
 import random
+import pathlib
 
 import numpy as np
 import torch
@@ -32,9 +33,9 @@ class DataAugmentation():
 
         if size is not None:
             if scale is None:
-                scale = [1, 1]
+                scale = (1, 1)
             if ratio is None:
-                ratio = [1, 1]
+                ratio = (1, 1)
             self.random_resize_crop = transforms.RandomResizedCrop(size=size, scale=scale, ratio=ratio)
 
         if any((brightness, contrast, saturation, hue)):
@@ -94,7 +95,7 @@ class DataAugmentation():
                         target[ii] = F.hflip(target[ii])
 
         if self.vflip is not None:
-            if random.random() < self.hflip:
+            if random.random() < self.vflip:
                 sample = F.vflip(sample)
                 mask = F.vflip(mask)
                 segment = F.vflip(segment)
@@ -105,6 +106,9 @@ class DataAugmentation():
         return (sample, mask, segment), target
 
     def __str__(self):
+        return 'Augmentation:\n' + str(self.get_transform())
+
+    def get_transform(self):
         trans = []
         if self.color_jitter is not None:
             trans.append(self.color_jitter)
@@ -116,7 +120,11 @@ class DataAugmentation():
             trans.append(transforms.RandomHorizontalFlip(self.hflip))
         if self.vflip is not None:
             trans.append(transforms.RandomVerticalFlip(self.vflip))
-        return 'Augmentation:\n' + str(transforms.Compose(trans))
+        return transforms.Compose(trans)
+
+    @property
+    def transform(self):
+        return self.get_transform()
 
 
 class DataPreparation():
@@ -143,14 +151,14 @@ class DataPreparation():
                     target[ii] = F.resize(target[ii], self.size, interpolation=Image.NEAREST)
 
         if self.crop is not None:
-            sample = F.center_crop(sample, self.size)
+            sample = F.center_crop(sample, self.crop)
             if mask is not None:
-                mask = F.center_crop(mask, self.size)
+                mask = F.center_crop(mask, self.crop)
             if segment is not None:
-                segment = F.center_crop(segment, self.size)
+                segment = F.center_crop(segment, self.crop)
             if target_is_image:
                 for ii in range(len(target)):
-                    target[ii] = F.center_crop(target[ii], self.size)
+                    target[ii] = F.center_crop(target[ii], self.crop)
 
         sample = self.convert(sample)
         if mask is not None:
@@ -211,6 +219,8 @@ class TripleDataset(torch.utils.data.Dataset):
         self.preparation = preparation
 
     def __len__(self):
+        if self.samples is None:
+            return 0
         return len(self.samples)
 
     def __getitem__(self, index):
@@ -230,7 +240,7 @@ class TripleDataset(torch.utils.data.Dataset):
         target = self.targets[index]
 
         # special treatment if target is class labels vs. filename
-        if isinstance(target, str):
+        if isinstance(target, (str, pathlib.Path)):
             target = self.loader(target)
             if len(target.getbands()) > 1:
                 targets = []
@@ -246,6 +256,8 @@ class TripleDataset(torch.utils.data.Dataset):
                     bg_mask = 255 - bg_mask
                     bg_mask = Image.fromarray(bg_mask)
                     target = [bg_mask, *targets]
+                else:
+                    target = targets
             else:
                 target = [target]
 
@@ -261,11 +273,11 @@ class TripleDataset(torch.utils.data.Dataset):
 
     def __str__(self):
         res = f'''Dataset:
-        Samples: {len(self.samples)}
+        Samples: {len(self.samples) if self.samples is not None else 0}
         Masks: {len(self.masks) if self.masks is not None else 0}
         Segmentation: {len(self.segmentations) if self.segmentations is not None else 0}
-        Targets: {len(self.targets)}, classes {self.targets.shape[1]}
-        Target labels: {self.target_labels.values}
+        Targets: {len(self.targets) if self.targets is not None else 0}, classes {self.targets.shape[1] if self.targets is not None else 0}
+        Target labels: {self.target_labels.values if self.target_labels is not None else ''}
         '''
         return res
 

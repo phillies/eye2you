@@ -1,5 +1,5 @@
-import torch.nn as nn
 import numpy as np
+import torch.nn as nn
 
 # def single_output_performance(labels, outputs, feature_number=5):
 #     if isinstance(outputs, tuple):
@@ -39,7 +39,7 @@ def segmentation_accuracy(predictions, targets):
         raise ValueError('Shape of targets {0} does not match shape of predictions {1}'.format(
             targets.shape, predictions.shape))
 
-    n, c, h, w = predictions.shape
+    n, _, _, _ = predictions.shape
     #if c != 1:
     #    raise ValueError('Only images with 1 channel supported')
 
@@ -65,7 +65,7 @@ def segmentation_iou(predictions, targets):
         raise ValueError('Shape of targets {0} does not match shape of predictions {1}'.format(
             targets.shape, predictions.shape))
 
-    n, c, h, w = predictions.shape
+    n, _, _, _ = predictions.shape
     #if c != 1:
     #    raise ValueError('Only images with 1 channel supported')
 
@@ -96,7 +96,7 @@ def segmentation_precision(predictions, targets):
         raise ValueError('Shape of targets {0} does not match shape of predictions {1}'.format(
             targets.shape, predictions.shape))
 
-    n, c, h, w = predictions.shape
+    n, _, _, _ = predictions.shape
     #if c != 1:
     #    raise ValueError('Only images with 1 channel supported')
 
@@ -126,7 +126,7 @@ def segmentation_recall(predictions, targets):
         raise ValueError('Shape of targets {0} does not match shape of predictions {1}'.format(
             targets.shape, predictions.shape))
 
-    n, c, h, w = predictions.shape
+    n, _, _, _ = predictions.shape
     #if c != 1:
     #    raise ValueError('Only images with 1 channel supported')
 
@@ -156,7 +156,7 @@ def segmentation_specificity(predictions, targets):
         raise ValueError('Shape of targets {0} does not match shape of predictions {1}'.format(
             targets.shape, predictions.shape))
 
-    n, c, h, w = predictions.shape
+    n, _, _, _ = predictions.shape
     #if c != 1:
     #    raise ValueError('Only images with 1 channel supported')
 
@@ -178,7 +178,7 @@ def segmentation_dice(predictions, targets):
         raise ValueError('Shape of targets {0} does not match shape of predictions {1}'.format(
             targets.shape, predictions.shape))
 
-    n, c, h, w = predictions.shape
+    n, _, _, _ = predictions.shape
     #if c != 1:
     #    raise ValueError('Only images with 1 channel supported')
 
@@ -227,15 +227,16 @@ class PerformanceMeter():
 
 class TotalAccuracyMeter(PerformanceMeter):
 
-    def __init__(self):
+    def __init__(self, preprocessing=nn.Sigmoid()):
         self.total = 0
         self.correct = 0
+        self.preprocess = preprocessing
 
     def update(self, output, target):
         if isinstance(output, tuple):
-            predicted = nn.Sigmoid()(output[0])
+            predicted = self.preprocess(output[0])
         else:
-            predicted = nn.Sigmoid()(output)
+            predicted = self.preprocess(output)
         perf = (predicted.round() == target).sum(1) == target.shape[1]
         num_correct = float(perf.sum())
         self.correct += num_correct
@@ -260,16 +261,17 @@ class TotalAccuracyMeter(PerformanceMeter):
 
 class SingleAccuracyMeter(PerformanceMeter):
 
-    def __init__(self, index=0):
+    def __init__(self, index=0, preprocessing=nn.Sigmoid()):
         self.total = 0
         self.correct = 0
         self.index = index
+        self.preprocess = preprocessing
 
     def update(self, output, target):
         if isinstance(output, tuple):
-            predicted = nn.Sigmoid()(output[0])
+            predicted = self.preprocess(output[0])
         else:
-            predicted = nn.Sigmoid()(output)
+            predicted = self.preprocess(output)
         perf = (predicted[:, self.index].round() == target[:, self.index])
         num_correct = float(perf.sum())
         self.correct += num_correct
@@ -289,7 +291,7 @@ class SingleAccuracyMeter(PerformanceMeter):
         return 'SingleAccuracyMeter(index={})'.format(self.index)
 
     def __str__(self):
-        return 'accuracy_class_{}'.format(self.index)
+        return 'cls_{}_accuracy'.format(self.index)
 
 
 class SegmentationAccuracyMeter(PerformanceMeter):

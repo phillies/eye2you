@@ -1,15 +1,12 @@
 # pylint: disable=redefined-outer-name
 import os
-import sys
 import pathlib
 
 import numpy as np
-import pytest
-from PIL import Image
 import torch
+from PIL import Image
 
 import eye2you
-from eye2you import models
 
 LOCAL_DIR = pathlib.Path(os.path.dirname(os.path.realpath(__file__)))
 RANDOM_SEED = 1337

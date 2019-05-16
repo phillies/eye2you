@@ -1,13 +1,9 @@
 # pylint: disable=redefined-outer-name
-import os
-import pathlib
-
-import numpy as np
-import pytest
 import torch
 import torchvision.transforms as transforms
-from eye2you.datasets import TripleDataset, DataAugmentation, DataPreparation
 from PIL import Image
+
+from eye2you.datasets import DataPreparation
 
 
 def test_preparation_initialization():

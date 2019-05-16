@@ -1,16 +1,13 @@
 # pylint: disable=redefined-outer-name
-import configparser
 import os
 import pathlib
 
-import numpy as np
 import pytest
 import torch
+import yaml
 
 import eye2you
 from eye2you import factory
-import yaml
-
 from eye2you.meter_functions import TotalAccuracyMeter
 
 LOCAL_DIR = pathlib.Path(os.path.dirname(os.path.realpath(__file__)))

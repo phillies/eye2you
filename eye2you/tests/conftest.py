@@ -1,6 +1,5 @@
 # pylint: disable=redefined-outer-name
 import os
-import configparser
 import pathlib
 
 import numpy as np

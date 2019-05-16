@@ -1,14 +1,17 @@
+# pylint: disable=eval-used
 import os
 
 import numpy as np
 import pandas as pd
 import torch
+# required for eval
+import torchvision  # pylint: disable=unused-import
 import yaml
-from sklearn.model_selection import StratifiedShuffleSplit, ShuffleSplit
+from sklearn.model_selection import ShuffleSplit, StratifiedShuffleSplit
 
 from . import datasets
-from . import meter_functions as mf
-import torchvision
+# required for eval
+from . import meter_functions as mf  # pylint: disable=unused-import
 
 
 def config_from_yaml(filename):
@@ -30,7 +33,8 @@ def config_from_yaml(filename):
     return config
 
 
-def load_csv(filename, root, mask_column_name='mask', segmentation_column_name='segmentation', target_colum_names=None):
+def load_csv(filename, root, mask_column_name='mask', segmentation_column_name='segmentation',
+             target_column_names=None):
     df = pd.read_csv(filename, index_col=0)
     df = df.sort_index()
     samples = np.array([os.path.join(root, v) for v in df.index.values])
@@ -42,8 +46,8 @@ def load_csv(filename, root, mask_column_name='mask', segmentation_column_name='
         segmentations = np.array([os.path.join(root, v) for v in df[segmentation_column_name].values])
 
     cols = df.columns.drop([mask_column_name, segmentation_column_name], errors='ignore')
-    if target_colum_names is not None:
-        cols = [c for c in cols if c in target_colum_names]
+    if target_column_names is not None:
+        cols = [c for c in cols if c in target_column_names]
 
     if len(cols) == 1 and isinstance(df[cols].iloc[0].values[0], str):
         targets = np.array([os.path.join(root, v[0]) for v in df[cols].values])
@@ -54,14 +58,28 @@ def load_csv(filename, root, mask_column_name='mask', segmentation_column_name='
 
 
 def data_from_config(config):
+
     if 'validation' in config:
+        if 'columns' in config:
+            columns = config['columns']
+        else:
+            columns = dict()
         train_samples, train_masks, train_segmentations, train_targets, target_labels = load_csv(
-            config['csv'], config['root'])
+            config['csv'], config['root'], **columns)
+
+        if 'columns' in config['validation']:
+            columns = config['validation']['columns']
+        else:
+            columns = dict()
         validation_samples, validation_masks, validation_segmentations, validation_targets, target_labels = load_csv(
-            config['validation']['csv'], config['validation']['root'])
+            config['validation']['csv'], config['validation']['root'], **columns)
 
     else:
-        samples, masks, segmentations, targets, target_labels = load_csv(config['csv'], config['root'])
+        if 'columns' in config:
+            columns = config['columns']
+        else:
+            columns = dict()
+        samples, masks, segmentations, targets, target_labels = load_csv(config['csv'], config['root'], **columns)
         if 'stratified' in config and config['stratified']:
             sss = StratifiedShuffleSplit(n_splits=1, test_size=config['test_size'])
             train_index, validation_index = next(iter(sss.split(X=samples, y=targets)))

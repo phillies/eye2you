@@ -229,11 +229,11 @@ class TripleDataset(torch.utils.data.Dataset):
 
         # get all frames for index
         sample = self.loader(self.samples[index])
-        if self.masks is None:
+        if self.masks is None or not isinstance(self.masks[index], str):
             mask = Image.fromarray(np.ones((sample.height, sample.width), dtype=np.uint8) * 255)
         else:
             mask = self.loader(self.masks[index]).convert('L')
-        if self.segmentations is None:
+        if self.segmentations is None or not isinstance(self.segmentations[index], str):
             segment = Image.fromarray(np.zeros((sample.height, sample.width), dtype=np.uint8))
         else:
             segment = self.loader(self.segmentations[index]).convert('L')

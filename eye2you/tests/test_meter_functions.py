@@ -2,7 +2,6 @@
 import numpy as np
 import torch
 
-import eye2you
 from eye2you import meter_functions as mf
 
 # TotalAccuracyMeter
@@ -13,11 +12,6 @@ from eye2you import meter_functions as mf
 # SegmentationSpecificityMeter
 # SegmentationIOUMeter
 # SegmentationDiceMeter
-
-# 5x5 patch, 0.85 accuracy, 0.75 precision, 0.6 recall, 0.875 specificity, 0.5 iou, 2/3 dice
-# 4x6 patch, 0.72 accuracy, 1/3 precision, 0.4 recall, 0.8 specificity, 2/9 iou, 16/44 dice
-
-EPSILON = 1e-9
 
 
 def test_totalaccuracymeter():
@@ -86,7 +80,7 @@ def test_singleaccuracymeter():
     meter.update((output1,), targets)
     assert meter.value() == 0.6
 
-    assert str(meter) == 'accuracy_class_1'
+    assert str(meter) == 'cls_1_accuracy'
     assert repr(meter) == 'SingleAccuracyMeter(index=1)'
 
 

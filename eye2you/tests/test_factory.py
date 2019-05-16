@@ -1,13 +1,13 @@
 # pylint: disable=redefined-outer-name
 import os
-import sys
 import pathlib
+import sys
 
 import numpy as np
 import pytest
-from PIL import Image
 import torch
 import yaml
+from PIL import Image
 
 import eye2you
 from eye2you import factory
@@ -43,7 +43,7 @@ def test_load_csv():
                                                                              root,
                                                                              mask_column_name='xxx',
                                                                              segmentation_column_name='xxx',
-                                                                             target_colum_names=['class A', 'class B'])
+                                                                             target_column_names=['class A', 'class B'])
     assert samples is not None
     assert masks is None
     assert segmentations is None

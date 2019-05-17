@@ -84,6 +84,197 @@ def test_singleaccuracymeter():
     assert repr(meter) == 'SingleAccuracyMeter(index=1)'
 
 
+def test_singlesensitivitymeter():
+    meter = mf.SingleSensitivityMeter(0)
+
+    assert meter.total == 0
+    assert meter.correct == 0
+    assert meter.value() == 0
+
+    targets = torch.Tensor((-0, -0, -0, -0, +1, +1, +1, +1, -0, +1)).reshape(10, 1)
+    output1 = torch.Tensor((-1, -1, -1, +1, -1, +1, +1, +1, -1, +1)).reshape(10, 1)  # 0.8 correct
+    output2 = torch.Tensor((-1, +1, -1, +1, -1, +1, -1, +1, +1, -1)).reshape(10, 1)  # 0.4 correct
+
+    meter.update(output1, targets)
+    assert meter.value() == 0.8
+    meter.update(output2, targets)
+    assert meter.value() == 0.6
+
+    meter.reset()
+    assert meter.total == 0
+    assert meter.correct == 0
+    assert meter.value() == 0
+
+    meter = mf.SingleSensitivityMeter(1)
+
+    targets = torch.cat((targets, targets), dim=1)
+    output2 = torch.cat((output1, output2), dim=1)  # 0.4 correct
+    output1 = torch.cat((output1, output1), dim=1)  # 0.8 correct
+
+    meter.update(output2, targets)
+    assert meter.value() == 0.4
+    meter.update((output1,), targets)
+    assert meter.value() == 0.6
+
+    assert str(meter) == 'cls_1_sensitivity'
+    assert repr(meter) == 'SingleSensitivityMeter(index=1)'
+
+
+def test_singlespecificitymeter():
+    meter = mf.SingleSpecificityMeter(0)
+
+    assert meter.total == 0
+    assert meter.correct == 0
+    assert meter.value() == 0
+
+    targets = torch.Tensor((-0, -0, -0, -0, +1, +1, +1, +1, -0, +1)).reshape(10, 1)
+    output1 = torch.Tensor((-1, -1, -1, +1, -1, +1, +1, +1, -1, +1)).reshape(10, 1)  # 0.8 correct
+    output2 = torch.Tensor((-1, +1, -1, +1, -1, +1, -1, +1, +1, -1)).reshape(10, 1)  # 0.4 correct
+
+    meter.update(output1, targets)
+    assert meter.value() == 0.8
+    meter.update(output2, targets)
+    assert meter.value() == 0.6
+
+    meter.reset()
+    assert meter.total == 0
+    assert meter.correct == 0
+    assert meter.value() == 0
+
+    meter = mf.SingleSpecificityMeter(1)
+
+    targets = torch.cat((targets, targets), dim=1)
+    output2 = torch.cat((output1, output2), dim=1)  # 0.4 correct
+    output1 = torch.cat((output1, output1), dim=1)  # 0.8 correct
+
+    meter.update(output2, targets)
+    assert meter.value() == 0.4
+    meter.update((output1,), targets)
+    assert meter.value() == 0.6
+
+    assert str(meter) == 'cls_1_specificity'
+    assert repr(meter) == 'SingleSpecificityMeter(index=1)'
+
+
+def test_singleprecisionmeter():
+    meter = mf.SinglePrecisionMeter(0)
+
+    assert meter.total == 0
+    assert meter.correct == 0
+    assert meter.value() == 0
+
+    targets = torch.Tensor((-0, -0, -0, -0, +1, +1, +1, +1, -0, +1)).reshape(10, 1)
+    output1 = torch.Tensor((-1, -1, -1, +1, -1, +1, +1, +1, -1, +1)).reshape(10, 1)  # 0.8 correct
+    output2 = torch.Tensor((-1, +1, -1, +1, -1, +1, -1, +1, +1, -1)).reshape(10, 1)  # 0.4 correct
+
+    meter.update(output1, targets)
+    assert meter.value() == 0.8
+    meter.update(output2, targets)
+    assert meter.value() == 0.6
+
+    meter.reset()
+    assert meter.total == 0
+    assert meter.correct == 0
+    assert meter.value() == 0
+
+    meter = mf.SinglePrecisionMeter(1)
+
+    targets = torch.cat((targets, targets), dim=1)
+    output2 = torch.cat((output1, output2), dim=1)  # 0.4 correct
+    output1 = torch.cat((output1, output1), dim=1)  # 0.8 correct
+
+    meter.update(output2, targets)
+    assert meter.value() == 0.4
+    meter.update((output1,), targets)
+    assert meter.value() == 0.6
+
+    assert str(meter) == 'cls_1_precision'
+    assert repr(meter) == 'SinglePrecisionMeter(index=1)'
+
+
+def test_singlef1nmeter():
+    meter = mf.SingleF1Meter(0)
+
+    assert meter.total == 0
+    assert meter.correct == 0
+    assert meter.value() == 0
+
+    targets = torch.Tensor((-0, -0, -0, -0, +1, +1, +1, +1, -0, +1)).reshape(10, 1)
+    output1 = torch.Tensor((-1, -1, -1, +1, -1, +1, +1, +1, -1, +1)).reshape(10, 1)  # 0.8 correct
+    output2 = torch.Tensor((-1, +1, -1, +1, -1, +1, -1, +1, +1, -1)).reshape(10, 1)  # 0.4 correct
+
+    meter.update(output1, targets)
+    assert meter.value() == 0.8
+    meter.update(output2, targets)
+    assert meter.value() == 0.6
+
+    meter.reset()
+    assert meter.total == 0
+    assert meter.correct == 0
+    assert meter.value() == 0
+
+    meter = mf.SingleF1Meter(1)
+
+    targets = torch.cat((targets, targets), dim=1)
+    output2 = torch.cat((output1, output2), dim=1)  # 0.4 correct
+    output1 = torch.cat((output1, output1), dim=1)  # 0.8 correct
+
+    meter.update(output2, targets)
+    assert meter.value() == 0.4
+    meter.update((output1,), targets)
+    assert meter.value() == 0.6
+
+    assert str(meter) == 'cls_1_f1'
+    assert repr(meter) == 'SingleF1Meter(index=1)'
+
+
+def test_rocaucmeter():
+    meter = mf.ROCAUCMeter(0)
+
+    assert len(meter.outputs) == 0
+    assert len(meter.targets) == 0
+    assert meter.value() == 0
+
+    targets = torch.Tensor((-0, -0, -0, -0, +1, +1, +1, +1, -0, +1)).reshape(10, 1)
+    output1 = torch.Tensor((-1, -1, -1, +1, -1, +1, +1, +1, -1, +1)).reshape(10, 1)  # 0.8 correct
+    output2 = torch.Tensor((-1, +1, -1, +1, -1, +1, -1, +1, +1, -1)).reshape(10, 1)  # 0.4 correct
+
+    meter.update(output1, targets)
+    np.testing.assert_allclose(meter.value(), 0.8)
+    meter.update(output2, targets)
+    np.testing.assert_allclose(meter.value(), 0.6)
+
+    meter.reset()
+    assert len(meter.outputs) == 0
+    assert len(meter.targets) == 0
+    assert meter.value() == 0
+
+    meter = mf.ROCAUCMeter(1)
+
+    targets = torch.cat((targets, targets), dim=1)
+    output2 = torch.cat((output1, output2), dim=1)  # 0.4 correct
+    output1 = torch.cat((output1, output1), dim=1)  # 0.8 correct
+
+    meter.update(output2, targets)
+    np.testing.assert_allclose(meter.value(), 0.4)
+    meter.update((output1,), targets)
+    np.testing.assert_allclose(meter.value(), 0.6)
+
+    assert str(meter) == 'roc_auc 1'
+    assert repr(meter) == 'ROCAUCMeter(index=1)'
+
+    meter = mf.ROCAUCMeter()
+
+    targets = torch.cat((targets, targets), dim=1)
+    output2 = torch.cat((output1, output2), dim=1)  # 0.4 correct
+    output1 = torch.cat((output1, output1), dim=1)  # 0.8 correct
+
+    meter.update(output2, targets)
+    np.testing.assert_allclose(meter.value(), 0.7)
+    meter.update((output1,), targets)
+    np.testing.assert_allclose(meter.value(), 0.75)
+
+
 def test_segmentationaccuracymeter(segmentation_examples):
     targets, output1, output2 = segmentation_examples
     pred1 = output1.round()

@@ -1,23 +1,100 @@
 import numpy as np
+import sklearn.metrics
+import torch
 import torch.nn as nn
 
-# def single_output_performance(labels, outputs, feature_number=5):
-#     if isinstance(outputs, tuple):
-#         predicted = nn.Sigmoid()(outputs[0])
-#     else:
-#         predicted = nn.Sigmoid()(outputs)
-#     perf2 = (predicted[:, feature_number].round() == labels[:, feature_number])
-#     num_correct = float(perf2.sum())
-#     return num_correct
 
-# def all_or_nothing_performance(labels, outputs):
-#     if isinstance(outputs, tuple):
-#         predicted = nn.Sigmoid()(outputs[0])
-#     else:
-#         predicted = nn.Sigmoid()(outputs)
-#     perf = (predicted.round() == labels).sum(1) == labels.size()[1]
-#     num_correct = float(perf.sum())
-#     return num_correct
+def _to_float(pred, targ):
+    if isinstance(pred, torch.Tensor):
+        p = pred.float()
+    else:
+        p = torch.Tensor(pred).float()
+    if isinstance(targ, torch.Tensor):
+        t = targ.float()
+    else:
+        t = torch.Tensor(targ).float()
+    return p, t
+
+
+def accuracy_all(predictions, targets):
+    pred, targ = _to_float(predictions, targets)
+    res = np.apply_along_axis(all, 1, (pred == targ)).astype(np.float)
+    res = res.sum() / res.size
+    return res
+
+
+def accuracy_classes(predictions, targets):
+    pred, targ = _to_float(predictions, targets)
+
+    res = (pred == targ).sum(0).float()
+    res = res / pred.shape[0]
+    return res
+
+
+def sensitivity_classes(predictions, targets):
+    pred, targ = _to_float(predictions, targets)
+
+    P = (targ == 1).sum(0).float()
+    #N = (targ == 0).sum(0)
+    #TN = ((targ == 0) * (pred == 0)).sum(0)
+    TP = ((targ == 1) * (pred == 1)).sum(0).float()
+    #FP = ((targ == 0) * (pred == 1)).sum(0)
+    #SFN = ((targ == 1) * (pred == 0)).sum(0)
+    res = TP / P
+    return res
+
+
+def specificity_classes(predictions, targets):
+    pred, targ = _to_float(predictions, targets)
+
+    N = (targ == 0).sum(0).float()
+    TN = ((targ == 0) * (pred == 0)).sum(0).float()
+    res = TN / N
+    return res
+
+
+def precision_classes(predictions, targets):
+    pred, targ = _to_float(predictions, targets)
+
+    TP = ((targ == 1) * (pred == 1)).sum(0).float()
+    FP = ((targ == 0) * (pred == 1)).sum(0).float()
+    res = TP / (TP + FP)
+    return res
+
+
+def f1_score_classes(predictions, targets):
+    pred, targ = _to_float(predictions, targets)
+
+    P = (targ == 1).sum(0).float()
+    TP = ((targ == 1) * (pred == 1)).sum(0).float()
+    FP = ((targ == 0) * (pred == 1)).sum(0).float()
+    res = 2 * TP / (TP + FP + P)
+    return res
+
+
+def roc_auc_classes(predictions, targets):
+    pred, targ = _to_float(predictions, targets)
+
+    res = np.zeros(pred.shape[1])
+    for ii in range(res.size):
+        res[ii] = sklearn.metrics.roc_auc_score(targ[:, ii], pred[:, ii])
+    return res
+
+
+def roc_auc_all(predictions, targets):
+    pred, targ = _to_float(predictions, targets)
+
+    res = sklearn.metrics.roc_auc_score(targ, pred)
+    return res
+
+
+def average_precision_score_classes(predictions, targets):
+    pred, targ = _to_float(predictions, targets)
+
+    res = np.zeros(pred.shape[1])
+    for ii in range(res.size):
+        res[ii] = sklearn.metrics.average_precision_score(targ[:, ii], pred[:, ii])
+    return res
 
 
 def segmentation_accuracy(predictions, targets):
@@ -234,11 +311,11 @@ class TotalAccuracyMeter(PerformanceMeter):
 
     def update(self, output, target):
         if isinstance(output, tuple):
-            predicted = self.preprocess(output[0])
+            predicted = self.preprocess(output[0]).round()
         else:
-            predicted = self.preprocess(output)
-        perf = (predicted.round() == target).sum(1) == target.shape[1]
-        num_correct = float(perf.sum())
+            predicted = self.preprocess(output).round()
+        res = accuracy_all(predicted, target)
+        num_correct = int(res * target.shape[0])
         self.correct += num_correct
         self.total += target.shape[0]
         return self.value()
@@ -269,11 +346,12 @@ class SingleAccuracyMeter(PerformanceMeter):
 
     def update(self, output, target):
         if isinstance(output, tuple):
-            predicted = self.preprocess(output[0])
+            predicted = self.preprocess(output[0]).round()
         else:
-            predicted = self.preprocess(output)
-        perf = (predicted[:, self.index].round() == target[:, self.index])
-        num_correct = float(perf.sum())
+            predicted = self.preprocess(output).round()
+
+        res = accuracy_classes(predicted, target)[self.index]
+        num_correct = int(res * target.shape[0])
         self.correct += num_correct
         self.total += target.shape[0]
         return self.value()
@@ -292,6 +370,193 @@ class SingleAccuracyMeter(PerformanceMeter):
 
     def __str__(self):
         return 'cls_{}_accuracy'.format(self.index)
+
+
+class SingleSensitivityMeter(PerformanceMeter):
+
+    def __init__(self, index=0, preprocessing=nn.Sigmoid()):
+        self.total = 0
+        self.correct = 0
+        self.index = index
+        self.preprocess = preprocessing
+
+    def update(self, output, target):
+        if isinstance(output, tuple):
+            predicted = self.preprocess(output[0]).round()
+        else:
+            predicted = self.preprocess(output).round()
+
+        res = sensitivity_classes(predicted, target)[self.index]
+        num_correct = int(res * target.shape[0])
+        self.correct += num_correct
+        self.total += target.shape[0]
+        return self.value()
+
+    def reset(self):
+        self.total = 0
+        self.correct = 0
+
+    def value(self):
+        if self.total == 0:
+            return 0
+        return self.correct / self.total
+
+    def __repr__(self):
+        return 'SingleSensitivityMeter(index={})'.format(self.index)
+
+    def __str__(self):
+        return 'cls_{}_sensitivity'.format(self.index)
+
+
+class SingleSpecificityMeter(PerformanceMeter):
+
+    def __init__(self, index=0, preprocessing=nn.Sigmoid()):
+        self.total = 0
+        self.correct = 0
+        self.index = index
+        self.preprocess = preprocessing
+
+    def update(self, output, target):
+        if isinstance(output, tuple):
+            predicted = self.preprocess(output[0]).round()
+        else:
+            predicted = self.preprocess(output).round()
+
+        res = specificity_classes(predicted, target)[self.index]
+        num_correct = int(res * target.shape[0])
+        self.correct += num_correct
+        self.total += target.shape[0]
+        return self.value()
+
+    def reset(self):
+        self.total = 0
+        self.correct = 0
+
+    def value(self):
+        if self.total == 0:
+            return 0
+        return self.correct / self.total
+
+    def __repr__(self):
+        return 'SingleSpecificityMeter(index={})'.format(self.index)
+
+    def __str__(self):
+        return 'cls_{}_specificity'.format(self.index)
+
+
+class SinglePrecisionMeter(PerformanceMeter):
+
+    def __init__(self, index=0, preprocessing=nn.Sigmoid()):
+        self.total = 0
+        self.correct = 0
+        self.index = index
+        self.preprocess = preprocessing
+
+    def update(self, output, target):
+        if isinstance(output, tuple):
+            predicted = self.preprocess(output[0]).round()
+        else:
+            predicted = self.preprocess(output).round()
+
+        res = precision_classes(predicted, target)[self.index]
+        num_correct = int(res * target.shape[0])
+        self.correct += num_correct
+        self.total += target.shape[0]
+        return self.value()
+
+    def reset(self):
+        self.total = 0
+        self.correct = 0
+
+    def value(self):
+        if self.total == 0:
+            return 0
+        return self.correct / self.total
+
+    def __repr__(self):
+        return 'SinglePrecisionMeter(index={})'.format(self.index)
+
+    def __str__(self):
+        return 'cls_{}_precision'.format(self.index)
+
+
+class SingleF1Meter(PerformanceMeter):
+
+    def __init__(self, index=0, preprocessing=nn.Sigmoid()):
+        self.total = 0
+        self.correct = 0
+        self.index = index
+        self.preprocess = preprocessing
+
+    def update(self, output, target):
+        if isinstance(output, tuple):
+            predicted = self.preprocess(output[0]).round()
+        else:
+            predicted = self.preprocess(output).round()
+
+        res = f1_score_classes(predicted, target)[self.index]
+        num_correct = int(res * target.shape[0])
+        self.correct += num_correct
+        self.total += target.shape[0]
+        return self.value()
+
+    def reset(self):
+        self.total = 0
+        self.correct = 0
+
+    def value(self):
+        if self.total == 0:
+            return 0
+        return self.correct / self.total
+
+    def __repr__(self):
+        return 'SingleF1Meter(index={})'.format(self.index)
+
+    def __str__(self):
+        return 'cls_{}_f1'.format(self.index)
+
+
+class ROCAUCMeter(PerformanceMeter):
+
+    def __init__(self, index=None):
+        self.outputs = []
+        self.targets = []
+        self.index = index
+
+    def update(self, output, target):
+        if isinstance(output, tuple):
+            predicted = (output[0])
+        else:
+            predicted = output
+
+        self.outputs.append(predicted)
+        self.targets.append(target)
+
+        return self.value()
+
+    def reset(self):
+        self.outputs = []
+        self.targets = []
+
+    def value(self):
+        if len(self.outputs) == 0:
+            return 0
+
+        if self.index is None:
+            res = roc_auc_all(np.vstack(self.outputs), np.vstack(self.targets))
+        else:
+            res = roc_auc_classes(np.vstack(self.outputs), np.vstack(self.targets))[self.index]
+
+        return res
+
+    def __repr__(self):
+        return 'ROCAUCMeter(index={})'.format(str(self.index))
+
+    def __str__(self):
+        if self.index is None:
+            return 'roc_auc'
+        else:
+            return 'roc_auc {}'.format(self.index)
 
 
 class SegmentationAccuracyMeter(PerformanceMeter):

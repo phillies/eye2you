@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import torchvision
 from PIL import Image
+import tqdm
 
 from .net import Network
 from .helper_functions import cv2_to_PIL, PIL_to_cv2, torch_to_cv2, torch_to_PIL, float_to_uint8, denormalize_mean_std, get_retina_mask
@@ -48,10 +49,6 @@ class E2YService():
     def initialize(self):
         raise NotImplementedError()
 
-    @property
-    def service_type(self):
-        raise NotImplementedError()
-
     def analyze_image(self, img):
         raise NotImplementedError()
 
@@ -59,7 +56,6 @@ class E2YService():
 class SimpleService(E2YService):
 
     def __init__(self, checkpoint, device=None):
-        self.service_type = 'classification'
         self.net = None
         self.checkpoint = checkpoint
 
@@ -109,10 +105,10 @@ class SimpleService(E2YService):
 
     def classify_all(self, filenames):
         outputs = []
-        for fname in filenames:
+        for fname in tqdm.tqdm(filenames, desc='Files', position=0):
             img = Image.open(fname)
             outputs.append(self.analyze_image(img))
-        return torch.Tensor(outputs)
+        return torch.stack(outputs, dim=0)
 
 
 class Service():

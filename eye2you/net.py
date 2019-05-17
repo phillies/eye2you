@@ -41,6 +41,8 @@ class Network():
             performance_meters = []
         self.performance_meters = performance_meters
 
+        self.class_labels = None
+
         self.initialize(model_kwargs=model_kwargs,
                         criterion_kwargs=criterion_kwargs,
                         optimizer_kwargs=optimizer_kwargs,
@@ -113,6 +115,8 @@ class Network():
         self.model.train()
         if self.scheduler is not None:
             self.scheduler.step()
+
+        self.class_labels = loader.dataset.target_labels
 
         total_loss = 0
         num_batches = int(loader.sampler.num_samples / loader.batch_size)

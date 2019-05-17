@@ -1,5 +1,4 @@
 import sys
-import configparser
 import functools
 
 import cv2
@@ -9,7 +8,7 @@ import torchvision
 from PIL import Image
 
 from .net import Network
-from .helper_functions import cv2_to_PIL, PIL_to_cv2, torch_to_cv2, float_to_uint8, find_retina_boxes, denormalize_mean_std, get_retina_mask
+from .helper_functions import cv2_to_PIL, PIL_to_cv2, torch_to_cv2, torch_to_PIL, float_to_uint8, denormalize_mean_std, get_retina_mask
 from . import factory
 from . import datasets
 
@@ -43,9 +42,24 @@ def majority_vote(predictions):
     result = (np.count_nonzero(predictions, axis=2) > predictions.shape[2] / 2) * 1.0
     return result
 
-class SimpleService():
+
+class E2YService():
+
+    def initialize(self):
+        raise NotImplementedError()
+
+    @property
+    def service_type(self):
+        raise NotImplementedError()
+
+    def analyze_image(self, img):
+        raise NotImplementedError()
+
+
+class SimpleService(E2YService):
 
     def __init__(self, checkpoint, device=None):
+        self.service_type = 'classification'
         self.net = None
         self.checkpoint = checkpoint
 
@@ -72,16 +86,18 @@ class SimpleService():
         else:
             self.image_size = (self.data_preparation.size, self.data_preparation.size)
 
-    def classify_image(self, img):
+    def analyze_image(self, img):
         if isinstance(img, np.ndarray):
             image = cv2_to_PIL(img)
+        if isinstance(img, torch.Tensor):
+            image = torch_to_PIL(img)
         elif isinstance(img, Image.Image):
             image = img
         else:
             raise ValueError('Only PIL Image or numpy array supported')
 
         # Convert image to tensor
-        x_input = self.data_preparation.get_transform()(image)
+        x_input = self.data_preparation.transform(image)
 
         #Reshape for input intp 1,n,h,w
         x_input = x_input.unsqueeze(0)
@@ -91,6 +107,12 @@ class SimpleService():
 
         return output.squeeze()
 
+    def classify_all(self, filenames):
+        outputs = []
+        for fname in filenames:
+            img = Image.open(fname)
+            outputs.append(self.analyze_image(img))
+        return torch.Tensor(outputs)
 
 
 class Service():

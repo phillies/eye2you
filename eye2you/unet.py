@@ -1,8 +1,9 @@
+# pylint: disable=arguments-differ
 import torch
 import torch.nn as nn
 
 
-def u_net(in_channels=3, out_channels=2, depth=2, final_layer='sigmoid'):
+def u_net(in_channels=3, out_channels=2, depth=2, final_layer='sigmoid', **kwargs):
     UnetClass = None
     if depth == 1:
         UnetClass = Unet1
@@ -16,7 +17,7 @@ def u_net(in_channels=3, out_channels=2, depth=2, final_layer='sigmoid'):
     return net
 
 
-def u_net_rec(in_channels=3, out_channels=2, depth=2, bias=False, final_layer='sigmoid'):
+def u_net_rec(in_channels=3, out_channels=2, depth=2, bias=False, final_layer='sigmoid', **kwargs):
     return Unet(in_channels=in_channels,
                 out_channels=out_channels,
                 depth=depth,

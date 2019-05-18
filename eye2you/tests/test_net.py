@@ -126,8 +126,8 @@ def test_network_warning_false_names():
 
 def test_network_train():
     config = factory.config_from_yaml(LOCAL_DIR / 'data/example.yaml')
-    config['dataset']['csv'] = str(LOCAL_DIR / config['dataset']['csv'])
-    config['dataset']['root'] = str(LOCAL_DIR / config['dataset']['root'])
+    config['dataset']['csv'] = config['dataset']['csv']
+    config['dataset']['root'] = config['dataset']['root']
     config['dataset']['validation']['csv'] = config['dataset']['csv']
     config['dataset']['validation']['root'] = config['dataset']['root']
 
@@ -149,8 +149,8 @@ def test_network_train():
 
 def test_network_train_value_error():
     config = factory.config_from_yaml(LOCAL_DIR / 'data/example.yaml')
-    config['dataset']['csv'] = str(LOCAL_DIR / config['dataset']['csv'])
-    config['dataset']['root'] = str(LOCAL_DIR / config['dataset']['root'])
+    config['dataset']['csv'] = config['dataset']['csv']
+    config['dataset']['root'] = config['dataset']['root']
     config['dataset']['validation']['csv'] = config['dataset']['csv']
     config['dataset']['validation']['root'] = config['dataset']['root']
 
@@ -174,8 +174,8 @@ def test_network_train_value_error():
 
 def test_network_validate():
     config = factory.config_from_yaml(LOCAL_DIR / 'data/example.yaml')
-    config['dataset']['csv'] = str(LOCAL_DIR / config['dataset']['csv'])
-    config['dataset']['root'] = str(LOCAL_DIR / config['dataset']['root'])
+    config['dataset']['csv'] = config['dataset']['csv']
+    config['dataset']['root'] = config['dataset']['root']
     config['dataset']['validation']['csv'] = config['dataset']['csv']
     config['dataset']['validation']['root'] = config['dataset']['root']
 

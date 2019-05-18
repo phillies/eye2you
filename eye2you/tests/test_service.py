@@ -8,6 +8,6 @@ import numpy as np
 from PIL import Image
 
 import eye2you.helper_functions
-from eye2you import Service
+from eye2you import SimpleService, CAMService
 
 LOCAL_DIR = pathlib.Path(os.path.dirname(os.path.realpath(__file__)))

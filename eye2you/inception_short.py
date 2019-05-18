@@ -2,8 +2,7 @@
 https://github.com/pytorch/vision/blob/master/torchvision/models/inception.py
 licensed under BSD-3
 '''
-import warnings
-
+# pylint: disable=arguments-differ
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

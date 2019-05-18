@@ -15,7 +15,7 @@ from . import meter_functions as mf  # pylint: disable=unused-import
 
 
 def config_from_yaml(filename):
-    with open(filename, 'r') as f:
+    with open(str(filename), 'r') as f:
         config = yaml.load(f, Loader=yaml.SafeLoader)
 
     # TODO: find better solution than eval()
@@ -23,12 +23,12 @@ def config_from_yaml(filename):
         config['net']['performance_meters'] = [eval(m) for m in config['net']['performance_meters']]
     if 'transform' in config['training'] and config['training']['transform'] is not None:
         config['training']['transform'] = eval(config['training']['transform'])
-    if 'target_transform' in config['training'] and config['training']['target_transform'] is not None:
-        config['training']['target_transform'] = eval(config['training']['target_transform'])
+    #if 'target_transform' in config['training'] and config['training']['target_transform'] is not None:
+    #    config['training']['target_transform'] = eval(config['training']['target_transform'])
     if 'transform' in config['validation'] and config['validation']['transform'] is not None:
         config['validation']['transform'] = eval(config['validation']['transform'])
-    if 'target_transform' in config['training'] and config['validation']['target_transform'] is not None:
-        config['validation']['target_transform'] = eval(config['validation']['target_transform'])
+    #if 'target_transform' in config['training'] and config['validation']['target_transform'] is not None:
+    #    config['validation']['target_transform'] = eval(config['validation']['target_transform'])
 
     return config
 

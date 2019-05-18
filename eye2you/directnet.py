@@ -1,8 +1,9 @@
+# pylint: disable=arguments-differ
 import torch.nn as nn
 import torch.nn.functional as F
 
 
-def directnet(in_channels=3, out_channels=1):
+def directnet(in_channels=3, out_channels=1, **kwargs):
     net = DirectNet(in_channels=in_channels, out_channels=out_channels)
     return net
 
@@ -37,7 +38,7 @@ class DirectNet(nn.Module):
         self.sep9 = DepthSeparable2d(in_channels=64, out_channels=16, kernel_size=7, padding=3, groups=16)
         self.sep10 = DepthSeparable2d(in_channels=16, out_channels=out_channels, kernel_size=5, padding=2, groups=1)
 
-    def forward(self, x, *args):
+    def forward(self, x, *args):  # pylint: disable=arguments-differ
         x = self.conv1(x)
         x = self.conv2(x)
 
@@ -106,7 +107,7 @@ class Basic2d(nn.Module):
         else:
             self.relu = None
 
-    def forward(self, x):
+    def forward(self, x):  # pylint: disable=arguments-differ
         x = self.conv(x)
         x = self.bn(x)
         if self.relu is not None:

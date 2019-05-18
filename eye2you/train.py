@@ -11,6 +11,12 @@ import numpy as np
 
 
 class Logger():
+    """Logger class for coach results.
+
+    Stores data with column names in Logger.columns for different categories
+    (e.g. training and validation).
+
+    """
 
     def __init__(self):
         self._log = dict()
@@ -30,6 +36,7 @@ class Logger():
     def read_csv(self, filename):
         df = pd.read_csv(filename, header=[0, 1], skip_blank_lines=True, index_col=0)
         self._log = dict()
+        self.columns = list(df.columns.levels[1])
         for cat in df.columns.levels[0]:
             self._log[cat] = df[cat]
 
@@ -58,7 +65,7 @@ class Logger():
             idx = self._log[category][criterion].idxmax(axis='index', skipna=True)
         else:
             idx = self._log[category][criterion].idxmin(axis='index', skipna=True)
-        return idx, self._log[category].iloc[idx]
+        return idx, self._log[category][criterion].iloc[idx]
 
 
 class Coach():
@@ -75,8 +82,11 @@ class Coach():
 
         self.epochs = 0
 
-    def load_config(self, filename):
-        self.config = factory.config_from_yaml(filename)
+    def load_config(self, config):
+        if isinstance(config, dict):
+            self.config = config
+        else:  # then it should be a filename
+            self.config = factory.config_from_yaml(config)
 
         dataprep = datasets.DataPreparation(**self.config['data_preparation'])
         dataaug = datasets.DataAugmentation(**self.config['data_augmentation'])
@@ -106,7 +116,7 @@ class Coach():
         torch.save(state_dict, filename)
 
     def save_config(self, filename):
-        with open(filename, 'w') as f:
+        with open(str(filename), 'w') as f:
             yaml.safe_dump(self.config, f)
 
     def load(self, filename, device=None):
@@ -115,8 +125,9 @@ class Coach():
                 device = 'cuda' if torch.cuda.is_available() else 'cpu'
             else:
                 device = self.device
-
         state_dict = torch.load(filename, map_location=device)
+        if self.net is None:
+            self.load_config(state_dict['config'])
         self.epochs = state_dict['epochs']
         self.config = state_dict['config']
         self.log = state_dict['log']

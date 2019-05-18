@@ -14,13 +14,14 @@ net:
     gamma: 0.25
   performance_meters:
     - mf.TotalAccuracyMeter()
+    - mf.TotalAccuracyMeter()
 
 dataset:
-  csv: data/test_classification.csv
-  root: data/
+  csv: eye2you/tests/data/test_classification.csv
+  root: eye2you/tests/data/
   validation:
-    csv: data/test_classification.csv
-    root: data/
+    csv: eye2you/tests/data/test_classification.csv
+    root: eye2you/tests/data/
 data_preparation:
   size: 200
   crop: 200
@@ -48,14 +49,12 @@ training:
   weighted_sampling_classes: [0,1]
   drop_last: True
   transform: torchvision.transforms.ToTensor()
-  target_transform: lambda x:x
 
 validation:
   batch_size: 2
   num_workers: 0
   shuffle: False
   transform: torchvision.transforms.ToTensor()
-  target_transform: lambda x:x
 
 coach:
   num_epochs: 5

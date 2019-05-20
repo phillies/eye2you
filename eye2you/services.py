@@ -95,7 +95,7 @@ class SimpleService(BaseService):
         x_input = x_input.unsqueeze(0)
 
         with torch.no_grad():
-            output = self.net.model(x_input.to(self.net.device))
+            output = self.net.model(x_input.to(self.net.device)).cpu()
 
         self.last_result = output.squeeze()
         return output.squeeze()

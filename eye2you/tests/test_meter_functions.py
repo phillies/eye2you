@@ -80,7 +80,7 @@ def test_singleaccuracymeter():
     meter.update((output1,), targets)
     assert meter.value() == 0.6
 
-    assert str(meter) == 'cls_1_accuracy'
+    assert str(meter) == '[1]accuracy'
     assert repr(meter) == 'SingleAccuracyMeter(index=1)'
 
 
@@ -116,7 +116,7 @@ def test_singlesensitivitymeter():
     meter.update((output1,), targets)
     assert meter.value() == 0.6
 
-    assert str(meter) == 'cls_1_sensitivity'
+    assert str(meter) == '[1]sensitivity'
     assert repr(meter) == 'SingleSensitivityMeter(index=1)'
 
 
@@ -152,7 +152,7 @@ def test_singlespecificitymeter():
     meter.update((output1,), targets)
     assert meter.value() == 0.6
 
-    assert str(meter) == 'cls_1_specificity'
+    assert str(meter) == '[1]specificity'
     assert repr(meter) == 'SingleSpecificityMeter(index=1)'
 
 
@@ -188,7 +188,7 @@ def test_singleprecisionmeter():
     meter.update((output1,), targets)
     assert meter.value() == 0.6
 
-    assert str(meter) == 'cls_1_precision'
+    assert str(meter) == '[1]precision'
     assert repr(meter) == 'SinglePrecisionMeter(index=1)'
 
 
@@ -224,7 +224,7 @@ def test_singlef1nmeter():
     meter.update((output1,), targets)
     assert meter.value() == 0.6
 
-    assert str(meter) == 'cls_1_f1'
+    assert str(meter) == '[1]f1'
     assert repr(meter) == 'SingleF1Meter(index=1)'
 
 

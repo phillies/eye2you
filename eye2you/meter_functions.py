@@ -382,7 +382,7 @@ class SingleAccuracyMeter(PerformanceMeter):
         return 'SingleAccuracyMeter(index={})'.format(self.index)
 
     def __str__(self):
-        return 'cls_{}_accuracy'.format(self.index)
+        return '[{}]accuracy'.format(self.index)
 
 
 class SingleSensitivityMeter(PerformanceMeter):
@@ -418,7 +418,7 @@ class SingleSensitivityMeter(PerformanceMeter):
         return 'SingleSensitivityMeter(index={})'.format(self.index)
 
     def __str__(self):
-        return 'cls_{}_sensitivity'.format(self.index)
+        return '[{}]sensitivity'.format(self.index)
 
 
 class SingleSpecificityMeter(PerformanceMeter):
@@ -454,7 +454,7 @@ class SingleSpecificityMeter(PerformanceMeter):
         return 'SingleSpecificityMeter(index={})'.format(self.index)
 
     def __str__(self):
-        return 'cls_{}_specificity'.format(self.index)
+        return '[{}]specificity'.format(self.index)
 
 
 class SinglePrecisionMeter(PerformanceMeter):
@@ -490,7 +490,7 @@ class SinglePrecisionMeter(PerformanceMeter):
         return 'SinglePrecisionMeter(index={})'.format(self.index)
 
     def __str__(self):
-        return 'cls_{}_precision'.format(self.index)
+        return '[{}]precision'.format(self.index)
 
 
 class SingleF1Meter(PerformanceMeter):
@@ -526,7 +526,7 @@ class SingleF1Meter(PerformanceMeter):
         return 'SingleF1Meter(index={})'.format(self.index)
 
     def __str__(self):
-        return 'cls_{}_f1'.format(self.index)
+        return '[{}]f1'.format(self.index)
 
 
 class ROCAUCMeter(PerformanceMeter):
@@ -569,7 +569,7 @@ class ROCAUCMeter(PerformanceMeter):
         if self.index is None:
             return 'roc_auc'
         else:
-            return 'cls_{}_roc_auc'.format(self.index)
+            return '[{}]roc_auc'.format(self.index)
 
 
 class SegmentationAccuracyMeter(PerformanceMeter):

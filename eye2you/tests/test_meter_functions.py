@@ -260,7 +260,7 @@ def test_rocaucmeter():
     meter.update((output1,), targets)
     np.testing.assert_allclose(meter.value(), 0.6)
 
-    assert str(meter) == 'roc_auc 1'
+    assert str(meter) == '[1]roc_auc'
     assert repr(meter) == 'ROCAUCMeter(index=1)'
 
     meter = mf.ROCAUCMeter()

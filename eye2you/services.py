@@ -34,9 +34,9 @@ def returnCAM(feature_conv, weight_softmax, class_idx, size_upsample=(256, 256),
     return output_cam
 
 
-def majority_vote(predictions):
-    result = (np.count_nonzero(predictions, axis=2) > predictions.shape[2] / 2) * 1.0
-    return result
+# def majority_vote(predictions):
+#     result = (np.count_nonzero(predictions, axis=2) > predictions.shape[2] / 2) * 1.0
+#     return result
 
 
 class BaseService():
@@ -81,7 +81,7 @@ class SimpleService(BaseService):
     def analyze_image(self, img):
         if isinstance(img, np.ndarray):
             image = cv2_to_PIL(img)
-        if isinstance(img, torch.Tensor):
+        elif isinstance(img, torch.Tensor):
             image = torch_to_PIL(img)
         elif isinstance(img, Image.Image):
             image = img
@@ -108,17 +108,20 @@ class SimpleService(BaseService):
         return torch.stack(outputs, dim=0)
 
     def __str__(self):
-        desc = 'medAI Service:\n'
+        desc = 'eye2you Service:\n'
         desc += 'Loaded from {}\n'.format(self.checkpoint)
-        desc += 'Network:\n' + str(self.net.model_name)
-        desc += 'Transform:\n' + str(self.data_preparation.get_transform())
+        desc += 'Network: ' + str(self.net.model_name)
+        desc += '\nTransform:\n' + str(self.data_preparation.get_transform()) + '\n'
         return desc
 
 
 class CAMService(SimpleService):
 
     def __init__(self, checkpoint, device=None):
-        self.feature_extractor_hook = None
+        self._feature_extractor_hook = None
+        self.num_classes = 0
+        self._final_conv_name = None
+        self._weight_softmax = None
         super().__init__(checkpoint, device)
 
     def initialize(self):
@@ -126,30 +129,30 @@ class CAMService(SimpleService):
 
         self.num_classes = list(self.net.model.children())[-1].out_features
         # This is the initialization of the class activation map extraction
-        self.finalconv_name = list(self.net.model.named_children())[-2][0]
+        self._finalconv_name = list(self.net.model.named_children())[-2][0]
         params = list(self.net.model.parameters())
-        self.weight_softmax = np.squeeze(params[-2].data.detach().cpu().numpy())
+        self._weight_softmax = np.squeeze(params[-2].data.detach().cpu().numpy())
 
     def hook_feature_extractor(self):
         # hook the feature extractor
-        self.feature_extractor_hook = self.net.model._modules.get(self.finalconv_name).register_forward_hook(  # pylint: disable=protected-access
+        self._feature_extractor_hook = self.net.model._modules.get(self._finalconv_name).register_forward_hook(  # pylint: disable=protected-access
             hook_feature)
 
     def unhook_feature_extractor(self):
-        if self.feature_extractor_hook is not None:
-            self.feature_extractor_hook.remove()
+        if self._feature_extractor_hook is not None:
+            self._feature_extractor_hook.remove()
 
-    def get_largest_prediction(self, image):
-        '''Returns the class index of the largest prediction
+    # def get_largest_prediction(self, image):
+    #     '''Returns the class index of the largest prediction
 
-        Arguments:
-            image {PIL.Image.Image} -- PIL image to analyze
+    #     Arguments:
+    #         image {PIL.Image.Image} -- PIL image to analyze
 
-        Returns:
-            int -- class index of the largest prediction
-        '''
-        pred = self.analyze_image(image)
-        return int(pred.argmax())
+    #     Returns:
+    #         int -- class index of the largest prediction
+    #     '''
+    #     pred = self.analyze_image(image)
+    #     return int(pred.argmax())
 
     def get_class_activation_map(self,
                                  image,
@@ -176,7 +179,7 @@ class CAMService(SimpleService):
             raise ValueError('single_cam not recognized as None, int, or tuple: {} with type {}'.format(
                 single_cam, type(single_cam)))
 
-        CAMs = returnCAM(FEATURE_BLOBS[-1], self.weight_softmax, idx, self.image_size)
+        CAMs = returnCAM(FEATURE_BLOBS[-1], self._weight_softmax, idx, image.size)
         if as_pil_image:
             for ii, cam in enumerate(CAMs):
                 CAMs[ii] = cv2_to_PIL(cam, min_threshold, max_threshold)

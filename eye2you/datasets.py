@@ -1,5 +1,5 @@
-import random
 import pathlib
+import random
 
 import numpy as np
 import torch
@@ -211,7 +211,7 @@ class TripleDataset(torch.utils.data.Dataset):
         self.segmentations = segmentations
         self.masks = masks
         self.targets = targets
-        self.target_labels = target_labels
+        self.target_labels = None if target_labels is None else list(target_labels)
 
         self.loader = loader
 
@@ -277,7 +277,7 @@ class TripleDataset(torch.utils.data.Dataset):
         Masks: {len(self.masks) if self.masks is not None else 0}
         Segmentation: {len(self.segmentations) if self.segmentations is not None else 0}
         Targets: {len(self.targets) if self.targets is not None else 0}, classes {self.targets.shape[1] if self.targets is not None else 0}
-        Target labels: {self.target_labels.values if self.target_labels is not None else ''}
+        Target labels: {self.target_labels if self.target_labels is not None else ''}
         '''
         return res
 

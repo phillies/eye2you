@@ -7,6 +7,7 @@ import pytest
 import torch
 import torchvision.transforms as transforms
 from PIL import Image
+import pandas as pd
 
 from eye2you.datasets import DataAugmentation, DataPreparation, TripleDataset
 
@@ -15,6 +16,36 @@ NUMBER_OF_CLASSES = 2
 NUMBER_OF_IMAGES = 4
 
 #TODO: Create an image with only red pixels to test the loading of a single color band as targets
+
+
+def compare_dataentries(entry1, entry2):
+    if isinstance(entry1, pd.DataFrame):
+        pd.testing.assert_frame_equal(entry1, entry2)
+    elif isinstance(entry1, np.ndarray):
+        np.testing.assert_equal(entry1, entry2)
+    else:
+        assert entry1 == entry2
+
+
+def compare_dataloader(loader1, loader2):
+    assert loader1.batch_size == loader2.batch_size
+    assert loader1.num_workers == loader2.num_workers
+    assert loader1.drop_last == loader2.drop_last
+    assert type(loader1) == type(loader2)
+    compare_datasets(loader1.dataset, loader2.dataset)
+
+
+def compare_datasets(data1, data2):
+    compare_dataentries(data1.samples, data2.samples)
+    compare_dataentries(data1.segmentations, data2.segmentations)
+    compare_dataentries(data1.masks, data2.masks)
+    compare_dataentries(data1.targets, data2.targets)
+    assert data1.target_labels == data2.target_labels
+
+    assert data1.loader == data2.loader
+
+    assert str(data1.augmentation) == str(data2.augmentation)
+    assert str(data1.preparation) == str(data2.preparation)
 
 
 def test_triple_dataset_setup_empty():

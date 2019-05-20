@@ -207,7 +207,8 @@ def test_from_and_to_state_dict():
 
     net_after = str(net2)
     assert net_before == net_after
-    assert compare_network_weights(net1, net2)
+    compare_network_setup(net1, net2)
+    compare_network_weights(net1, net2)
 
 
 def test_load_state_dict():
@@ -218,7 +219,53 @@ def test_load_state_dict():
     net2 = eye2you.net.Network(**config['net'])
     net2.load_state_dict(state_dict)
 
-    assert compare_network_weights(net1, net2)
+    compare_network_setup(net1, net2)
+    compare_network_weights(net1, net2)
+
+
+def compare_network_setup(net1, net2):
+    assert net1.model_name == net2.model_name
+    assert net1.criterion_name == net2.criterion_name
+    assert net1.optimizer_name == net1.optimizer_name
+
+    if net1.model_kwargs is not None:
+        assert net2.model_kwargs is not None
+        assert sorted(net1.model_kwargs.keys()) == sorted(net2.model_kwargs.keys())
+        for key, val in net1.model_kwargs.items():
+            assert val == net2.model_kwargs[key]
+    else:
+        assert net2.model_kwargs is None
+
+    if net1.criterion_kwargs is not None:
+        assert net2.criterion_kwargs is not None
+        assert sorted(net1.criterion_kwargs.keys()) == sorted(net2.criterion_kwargs.keys())
+        for key, val in net1.criterion_kwargs.items():
+            assert val == net2.criterion_kwargs[key]
+    else:
+        assert net2.criterion_kwargs is None
+
+    if net1.optimizer_kwargs is not None:
+        assert net2.optimizer_kwargs is not None
+        assert sorted(net1.optimizer_kwargs.keys()) == sorted(net2.optimizer_kwargs.keys())
+        for key, val in net1.optimizer_kwargs.items():
+            assert val == net2.optimizer_kwargs[key]
+    else:
+        assert net2.optimizer_kwargs is None
+
+    if net1.scheduler is None:
+        assert net2.scheduler is None
+    else:
+        assert net2.scheduler is not None
+
+    if net1.scheduler_kwargs is not None:
+        assert net2.scheduler_kwargs is not None
+        assert sorted(net1.scheduler_kwargs.keys()) == sorted(net2.scheduler_kwargs.keys())
+        for key, val in net1.scheduler_kwargs.items():
+            assert val == net2.scheduler_kwargs[key]
+    else:
+        assert net2.scheduler_kwargs is None
+    assert net1.target_labels == net2.target_labels
+    assert net1.device == net2.device
 
 
 def compare_network_weights(net1, net2):
@@ -244,8 +291,6 @@ def compare_network_weights(net1, net2):
                 assert par1[key].allclose(par2[key])
             else:
                 assert par1[key] == par2[key]
-
-    return True
 
 
 def test_network_print():

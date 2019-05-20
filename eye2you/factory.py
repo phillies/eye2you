@@ -1,34 +1,99 @@
-# pylint: disable=eval-used
+import ast
+import copy
+import inspect
 import os
 
 import numpy as np
 import pandas as pd
 import torch
-# required for eval
-import torchvision  # pylint: disable=unused-import
+import torchvision
 import yaml
 from sklearn.model_selection import ShuffleSplit, StratifiedShuffleSplit
 
 from . import datasets
-# required for eval
-from . import meter_functions as mf  # pylint: disable=unused-import
+from . import meter_functions as mf
+
+METER_FUNCTIONS = dict(inspect.getmembers(mf, inspect.isclass))
+# TRANSFORM_FUNCTIONS = dict(inspect.getmembers(torchvision.transforms, inspect.isclass))
+
+
+def _parse_list(config):
+    for ii, val in enumerate(config):
+        if isinstance(val, dict):
+            config[ii] = _parse_dict(val)
+        elif isinstance(val, list):
+            config[ii] = _parse_list(val)
+        elif isinstance(val, tuple):
+            config[ii] = _parse_list(list(val))
+        elif isinstance(val, (int, float, str, bool)) or val is None:
+            pass
+        else:
+            config[ii] = repr(val)
+    return config
+
+
+def _parse_dict(config):
+    for key, val in config.items():
+        if isinstance(val, dict):
+            config[key] = _parse_dict(val)
+        elif isinstance(val, list):
+            config[key] = _parse_list(val)
+        elif isinstance(val, tuple):
+            config[key] = _parse_list(list(val))
+        elif isinstance(val, (int, float, str, bool)) or val is None:
+            pass
+        else:
+            config[key] = repr(val)
+    return config
+
+
+def yamlize_config(config):
+    config = copy.deepcopy(config)
+    config = _parse_dict(config)
+    return config
+
+
+def parse_constructor(param):
+    tree = ast.parse(param)
+    funccall = tree.body[0].value
+    funcname = tree.body[0].value.func.id
+
+    args = [ast.literal_eval(arg) for arg in funccall.args]
+    kwargs = {arg.arg: ast.literal_eval(arg.value) for arg in funccall.keywords}
+    return funcname, args, kwargs
+
+
+def get_meter(meter_string):
+    meter_name, args, kwargs = parse_constructor(meter_string)
+    meter = METER_FUNCTIONS[meter_name](*args, **kwargs)
+    return meter
+
+
+# def get_transform(transforms):
+#     if isinstance(transforms, str):
+#         transforms = transforms.replace('torchvision.transforms.', '')
+#         trans_name, args, kwargs = parse_constructor(transforms)
+#         trans = TRANSFORM_FUNCTIONS[trans_name](*args, **kwargs)
+#     else:
+#         trans = []
+#         for t in transforms:
+#             t = t.replace('torchvision.transforms.', '')
+#             trans_name, args, kwargs = parse_constructor(t)
+#             trans.append(TRANSFORM_FUNCTIONS[trans_name](*args, **kwargs))
+#         #trans = torchvision.transforms.Compose(trans)
+#     return trans
 
 
 def config_from_yaml(filename):
     with open(str(filename), 'r') as f:
         config = yaml.load(f, Loader=yaml.SafeLoader)
 
-    # TODO: find better solution than eval()
     if 'performance_meters' in config['net'] and config['net']['performance_meters'] is not None:
-        config['net']['performance_meters'] = [eval(m) for m in config['net']['performance_meters']]
-    if 'transform' in config['training'] and config['training']['transform'] is not None:
-        config['training']['transform'] = eval(config['training']['transform'])
-    #if 'target_transform' in config['training'] and config['training']['target_transform'] is not None:
-    #    config['training']['target_transform'] = eval(config['training']['target_transform'])
-    if 'transform' in config['validation'] and config['validation']['transform'] is not None:
-        config['validation']['transform'] = eval(config['validation']['transform'])
-    #if 'target_transform' in config['training'] and config['validation']['target_transform'] is not None:
-    #    config['validation']['target_transform'] = eval(config['validation']['target_transform'])
+        config['net']['performance_meters'] = [get_meter(m) for m in config['net']['performance_meters']]
+    # if 'transform' in config['training'] and config['training']['transform'] is not None:
+    #     config['training']['transform'] = get_transform(config['training']['transform'])
+    # if 'transform' in config['validation'] and config['validation']['transform'] is not None:
+    #     config['validation']['transform'] = get_transform(config['validation']['transform'])
 
     return config
 
@@ -53,7 +118,7 @@ def load_csv(filename, root, mask_column_name='mask', segmentation_column_name='
         targets = np.array([os.path.join(root, v[0]) for v in df[cols].values])
     else:
         targets = np.array(df[cols].values)
-    target_labels = cols
+    target_labels = list(cols)
     return samples, masks, segmentations, targets, target_labels
 
 

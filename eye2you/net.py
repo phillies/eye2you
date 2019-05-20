@@ -20,7 +20,8 @@ class Network():
                  criterion_kwargs=None,
                  optimizer_kwargs=None,
                  use_scheduler=False,
-                 scheduler_kwargs=None):
+                 scheduler_kwargs=None,
+                 target_labels=None):
 
         self.device = device
 
@@ -41,7 +42,7 @@ class Network():
             performance_meters = []
         self.performance_meters = performance_meters
 
-        self.class_labels = None
+        self.target_labels = target_labels
 
         self.initialize(model_kwargs=model_kwargs,
                         criterion_kwargs=criterion_kwargs,
@@ -116,7 +117,7 @@ class Network():
         if self.scheduler is not None:
             self.scheduler.step()
 
-        self.class_labels = loader.dataset.target_labels
+        self.target_labels = loader.dataset.target_labels
 
         total_loss = 0
         num_batches = int(loader.sampler.num_samples / loader.batch_size)
@@ -162,6 +163,9 @@ class Network():
         total_loss = 0
         num_samples = loader.sampler.num_samples
         num_batches = int(loader.sampler.num_samples / loader.batch_size)
+
+        if self.target_labels is None:
+            self.target_labels = loader.dataset.target_labels
 
         for perf_meter in self.performance_meters:
             perf_meter.reset()
@@ -211,6 +215,7 @@ class Network():
             state_dict['criterion_name'] = self.criterion_name
             state_dict['criterion_kwargs'] = self.criterion_kwargs
         state_dict['performance_meters'] = [repr(p) for p in self.performance_meters]
+        state_dict['target_labels'] = self.target_labels
         return state_dict
 
     @staticmethod
@@ -241,7 +246,8 @@ class Network():
                       criterion_kwargs=state_dict['criterion_kwargs'],
                       optimizer_kwargs=optimizer_kwargs,
                       use_scheduler=use_scheduler,
-                      scheduler_kwargs=scheduler_kwargs)
+                      scheduler_kwargs=scheduler_kwargs,
+                      target_labels=state_dict['target_labels'])
         net.load_state_dict(state_dict)
         return net
 

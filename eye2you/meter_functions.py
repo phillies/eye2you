@@ -3,6 +3,8 @@ import sklearn.metrics
 import torch
 import torch.nn as nn
 
+import yaml
+
 
 def _to_float(pred, targ):
     if isinstance(pred, torch.Tensor):
@@ -77,14 +79,19 @@ def roc_auc_classes(predictions, targets):
 
     res = np.zeros(pred.shape[1])
     for ii in range(res.size):
-        res[ii] = sklearn.metrics.roc_auc_score(targ[:, ii], pred[:, ii])
+        try:
+            res[ii] = sklearn.metrics.roc_auc_score(targ[:, ii], pred[:, ii])
+        except ValueError:
+            res[ii] = 0
     return res
 
 
 def roc_auc_all(predictions, targets):
     pred, targ = _to_float(predictions, targets)
-
-    res = sklearn.metrics.roc_auc_score(targ, pred)
+    try:
+        res = sklearn.metrics.roc_auc_score(targ, pred)
+    except ValueError:
+        res = np.zeros((pred.shape[0]))
     return res
 
 
@@ -93,7 +100,10 @@ def average_precision_score_classes(predictions, targets):
 
     res = np.zeros(pred.shape[1])
     for ii in range(res.size):
-        res[ii] = sklearn.metrics.average_precision_score(targ[:, ii], pred[:, ii])
+        try:
+            res[ii] = sklearn.metrics.average_precision_score(targ[:, ii], pred[:, ii])
+        except ValueError:
+            res[ii] = 0
     return res
 
 
@@ -301,6 +311,9 @@ class PerformanceMeter():
         '''
         raise NotImplementedError
 
+    def __eq__(self, comp):
+        return repr(self) == repr(comp)
+
 
 class TotalAccuracyMeter(PerformanceMeter):
 
@@ -341,7 +354,7 @@ class SingleAccuracyMeter(PerformanceMeter):
     def __init__(self, index=0, preprocessing=nn.Sigmoid()):
         self.total = 0
         self.correct = 0
-        self.index = index
+        self.index = int(index)
         self.preprocess = preprocessing
 
     def update(self, output, target):
@@ -377,7 +390,7 @@ class SingleSensitivityMeter(PerformanceMeter):
     def __init__(self, index=0, preprocessing=nn.Sigmoid()):
         self.total = 0
         self.correct = 0
-        self.index = index
+        self.index = int(index)
         self.preprocess = preprocessing
 
     def update(self, output, target):
@@ -413,7 +426,7 @@ class SingleSpecificityMeter(PerformanceMeter):
     def __init__(self, index=0, preprocessing=nn.Sigmoid()):
         self.total = 0
         self.correct = 0
-        self.index = index
+        self.index = int(index)
         self.preprocess = preprocessing
 
     def update(self, output, target):
@@ -449,7 +462,7 @@ class SinglePrecisionMeter(PerformanceMeter):
     def __init__(self, index=0, preprocessing=nn.Sigmoid()):
         self.total = 0
         self.correct = 0
-        self.index = index
+        self.index = int(index)
         self.preprocess = preprocessing
 
     def update(self, output, target):
@@ -485,7 +498,7 @@ class SingleF1Meter(PerformanceMeter):
     def __init__(self, index=0, preprocessing=nn.Sigmoid()):
         self.total = 0
         self.correct = 0
-        self.index = index
+        self.index = int(index)
         self.preprocess = preprocessing
 
     def update(self, output, target):
@@ -521,7 +534,7 @@ class ROCAUCMeter(PerformanceMeter):
     def __init__(self, index=None):
         self.outputs = []
         self.targets = []
-        self.index = index
+        self.index = None if index is None else int(index)
 
     def update(self, output, target):
         if isinstance(output, tuple):

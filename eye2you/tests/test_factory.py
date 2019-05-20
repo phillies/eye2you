@@ -6,6 +6,7 @@ import sys
 import numpy as np
 import pytest
 import torch
+import torchvision
 import yaml
 from PIL import Image
 
@@ -160,3 +161,37 @@ def test_get_loader():
     assert loader is not None
     assert loader.batch_size == 2
     assert loader.sampler.num_samples == 4
+
+
+def test_configparser():
+    config = {
+        0: dict(),
+        1: list(),
+        2: tuple(),
+        3: int(5),
+        4: float(3.5),
+        5: str('abc'),
+        6: bool(True),
+        7: None,
+        8: torchvision.transforms.ToTensor(),
+    }
+    vals = config.values()
+    config[0] = config.copy()
+    config[1] = list(vals)
+    config[2] = tuple(vals)
+    yamlcfg = factory.yamlize_config(config)
+    assert yamlcfg is not None
+
+
+# def test_transform():
+#     trans_string = repr(torchvision.transforms.ToTensor())
+#     trans = factory.get_transform(trans_string)
+#     assert repr(trans) == trans_string
+
+#     trans_list = [
+#         repr(torchvision.transforms.ToTensor()),
+#         repr(torchvision.transforms.Normalize(mean=[0, 0, 0], std=[1, 1, 1])),
+#     ]
+#     trans = factory.get_transform(trans_list)
+#     for t1, t2 in zip(trans_list, trans):
+#         assert t1 == repr(t2)

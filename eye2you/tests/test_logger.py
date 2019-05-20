@@ -1,8 +1,19 @@
-# pylint: disable=redefined-outer-name
+# pylint: disable=redefined-outer-name,protected-access
 import numpy as np
 import os
 
 from eye2you.train import Logger
+
+
+def compare_logger(log1, log2):
+    for cat in log1._log.keys():
+        np.testing.assert_allclose(log1._log[cat].values, log2._log[cat].values)
+    assert all([col in log1.columns for col in log2.columns])
+    assert all([col in log2.columns for col in log1.columns])
+    assert all([cat in log1._log.keys() for cat in log2._log.keys()])
+    for col in log1.columns:
+        for cat in log1._log.keys():
+            np.testing.assert_allclose(log1._log[cat][col].values, log2._log[cat][col].values)
 
 
 def test_logger_init():
@@ -56,11 +67,11 @@ def test_logger_minmax():
         log.append(data2[ii, :], 'Cat2')
 
     idx, val = log.get_best('Cat2', 'loss', 'max')
-    assert val == data2[:, 0].max()
+    np.testing.assert_allclose(val, data2[data2[:, 0].argmax(), :])
     assert idx == data2[:, 0].argmax()
 
     idx, val = log.get_best('Cat2', 'data', 'min')
-    assert val == data2[:, 1].min()
+    np.testing.assert_allclose(val, data2[data2[:, 1].argmin(), :])
     assert idx == data2[:, 1].argmin()
 
     idxmax, idxmin = log.idxmaxmin('Cat1')
@@ -87,11 +98,4 @@ def test_logger_saveload(tmp_path):
     log2 = Logger()
     log2.read_csv(tmp_path / 'test.csv')
 
-    for cat in log._log.keys():
-        np.testing.assert_allclose(log._log[cat].values, log2._log[cat].values)
-    assert all([col in log.columns for col in log2.columns])
-    assert all([col in log2.columns for col in log.columns])
-    assert all([cat in log._log.keys() for cat in log2._log.keys()])
-    for col in log.columns:
-        np.testing.assert_allclose(log._log['Cat1'][col].values, log2._log['Cat1'][col].values)
-        np.testing.assert_allclose(log._log['Cat2'][col].values, log2._log['Cat2'][col].values)
+    compare_logger(log, log2)

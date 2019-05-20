@@ -13,8 +13,8 @@ net:
     step_size: 10
     gamma: 0.25
   performance_meters:
-    - mf.TotalAccuracyMeter()
-    - mf.TotalAccuracyMeter()
+    - TotalAccuracyMeter()
+    - TotalAccuracyMeter()
 
 dataset:
   csv: eye2you/tests/data/test_classification.csv
@@ -48,13 +48,11 @@ training:
   replacement: False
   weighted_sampling_classes: [0,1]
   drop_last: True
-  transform: torchvision.transforms.ToTensor()
 
 validation:
   batch_size: 2
   num_workers: 0
   shuffle: False
-  transform: torchvision.transforms.ToTensor()
 
 coach:
   num_epochs: 5

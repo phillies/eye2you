@@ -8,15 +8,13 @@ import torch
 
 LOCAL_DIR = pathlib.Path(os.path.dirname(os.path.realpath(__file__)))
 
+# @pytest.fixture
+# def data_classification_labels():
+#     return torch.Tensor(np.random.rand(100, 3)).round()
 
-@pytest.fixture
-def data_classification_labels():
-    return torch.Tensor(np.random.rand(100, 3)).round()
-
-
-@pytest.fixture
-def data_classification_outputs():
-    return torch.Tensor(np.random.randn(100, 3))
+# @pytest.fixture
+# def data_classification_outputs():
+#     return torch.Tensor(np.random.randn(100, 3))
 
 
 @pytest.fixture(scope='module')

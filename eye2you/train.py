@@ -1,13 +1,13 @@
+import numpy as np
 import pandas as pd
 import torch
 import torchvision.transforms as transforms
 import tqdm
 import yaml
+from sklearn.linear_model import LinearRegression
 
 from . import datasets, factory
 from .net import Network
-from sklearn.linear_model import LinearRegression
-import numpy as np
 
 
 class Logger():
@@ -65,7 +65,7 @@ class Logger():
             idx = self._log[category][criterion].idxmax(axis='index', skipna=True)
         else:
             idx = self._log[category][criterion].idxmin(axis='index', skipna=True)
-        return idx, self._log[category][criterion].iloc[idx]
+        return idx, self._log[category].iloc[idx].values
 
 
 class Coach():
@@ -117,7 +117,7 @@ class Coach():
 
     def save_config(self, filename):
         with open(str(filename), 'w') as f:
-            yaml.safe_dump(self.config, f)
+            yaml.safe_dump(factory.yamlize_config(self.config), f)
 
     def load(self, filename, device=None):
         if device is None:
@@ -147,7 +147,7 @@ class Coach():
         pbar = tqdm.tqdm(total=num_epochs, desc='Epoch', position=0)
         log_title = tqdm.tqdm(total=0, desc='Criteria', position=2, bar_format='{desc}')
         log_title.set_description_str(
-            ('Performance meter: ' + ' {:>6.6}' * (1 + len(self.net.performance_meters))).format(
+            ('Performance meter: ' + ' {:>8.8}' * (1 + len(self.net.performance_meters))).format(
                 'loss', *[p.__str__() for p in self.net.performance_meters]))
 
         log_train = tqdm.tqdm(total=0, desc='Training results', position=3, bar_format='{desc}')
@@ -163,11 +163,11 @@ class Coach():
 
             best_idx, best_results = self.log.get_best('validation', early_stop_criterion)
             log_train.set_description_str(
-                ('Training results:  ' + ' {:.4f}' * len(train_results)).format(*train_results))
+                ('Training results:  ' + ' {:>8.4f}' * len(train_results)).format(*train_results))
             log_val.set_description_str(
-                ('Validation results:' + ' {:.4f}' * len(validate_results)).format(*validate_results))
+                ('Validation results:' + ' {:>8.4f}' * len(validate_results)).format(*validate_results))
             log_best.set_description_str(
-                ('Best after {:7d}:' + ' {:.4f}' * len(best_results)).format(best_idx, *best_results))
+                ('Best after {:7d}:' + ' {:>8.4f}' * len(best_results)).format(best_idx, *best_results))
 
             if log_filename is not None:
                 self.log.to_csv(log_filename)

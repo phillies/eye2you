@@ -8,11 +8,11 @@ import yaml
 
 def _to_float(pred, targ):
     if isinstance(pred, torch.Tensor):
-        p = pred.float()
+        p = pred.float().detach().cpu()
     else:
         p = torch.Tensor(pred).float()
     if isinstance(targ, torch.Tensor):
-        t = targ.float()
+        t = targ.float().detach().cpu()
     else:
         t = torch.Tensor(targ).float()
     return p, t
@@ -542,8 +542,8 @@ class ROCAUCMeter(PerformanceMeter):
         else:
             predicted = output
 
-        self.outputs.append(predicted)
-        self.targets.append(target)
+        self.outputs.append(predicted.detach().cpu())
+        self.targets.append(target.detach().cpu())
 
         return self.value()
 
@@ -569,7 +569,7 @@ class ROCAUCMeter(PerformanceMeter):
         if self.index is None:
             return 'roc_auc'
         else:
-            return 'roc_auc {}'.format(self.index)
+            return 'cls_{}_roc_auc'.format(self.index)
 
 
 class SegmentationAccuracyMeter(PerformanceMeter):

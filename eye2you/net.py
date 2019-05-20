@@ -13,7 +13,7 @@ class Network():
     def __init__(self,
                  device,
                  model_name,
-                 criterion_name,
+                 criterion_name=None,
                  optimizer_name=None,
                  performance_meters=None,
                  model_kwargs=None,
@@ -222,6 +222,12 @@ class Network():
     def from_state_dict(state_dict, device=None):
         if device is None:
             device = state_dict['device']
+        if 'criterion_name' in state_dict:
+            criterion_name = state_dict['criterion_name']
+            criterion_kwargs = state_dict['criterion_kwargs']
+        else:
+            criterion_name = None
+            criterion_kwargs = None
 
         if 'optimizer' in state_dict:
             optimizer_name = state_dict['optimizer_name']
@@ -237,17 +243,27 @@ class Network():
             use_scheduler = False
             scheduler_kwargs = None
 
+        if 'performance_meters' in state_dict:
+            performance_meters = state_dict['performance_meters']
+        else:
+            performance_meters = None
+
+        if 'target_labels' in state_dict:
+            target_labels = state_dict['target_labels']
+        else:
+            target_labels = None
+
         net = Network(device=device,
                       model_name=state_dict['model_name'],
-                      criterion_name=state_dict['criterion_name'],
+                      criterion_name=criterion_name,
                       optimizer_name=optimizer_name,
-                      performance_meters=state_dict['performance_meters'],
+                      performance_meters=performance_meters,
                       model_kwargs=state_dict['model_kwargs'],
-                      criterion_kwargs=state_dict['criterion_kwargs'],
+                      criterion_kwargs=criterion_kwargs,
                       optimizer_kwargs=optimizer_kwargs,
                       use_scheduler=use_scheduler,
                       scheduler_kwargs=scheduler_kwargs,
-                      target_labels=state_dict['target_labels'])
+                      target_labels=target_labels)
         net.load_state_dict(state_dict)
         return net
 

@@ -166,8 +166,8 @@ class Coach():
                 ('Training results:  ' + ' {:>8.4f}' * len(train_results)).format(*train_results))
             log_val.set_description_str(
                 ('Validation results:' + ' {:>8.4f}' * len(validate_results)).format(*validate_results))
-            log_best.set_description_str(
-                ('Best after {:7d}:' + ' {:>8.4f}' * len(best_results)).format(best_idx, *best_results))
+            log_best.set_description_str(('Best after {:7d}:' + ' {:>8.4f}' * len(best_results)).format(
+                best_idx, *best_results))
 
             if log_filename is not None:
                 self.log.to_csv(log_filename)
@@ -176,7 +176,7 @@ class Coach():
                 idxmax, idxmin = self.log.idxmaxmin('validation')
                 for ii, idx in enumerate(idxmax[1:]):
                     if idx == self.epochs:
-                        self.save(checkpoint + '.' + idxmax.index[ii] + '.ckpt')
+                        self.save(checkpoint + '.' + idxmax.index[ii + 1] + '.ckpt')
                 if idxmin[0] == self.epochs:
                     self.save(checkpoint + '.' + idxmax.index[0] + '.ckpt')
 

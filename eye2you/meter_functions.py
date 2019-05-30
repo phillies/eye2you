@@ -22,6 +22,7 @@ def accuracy_all(predictions, targets):
     pred, targ = _to_float(predictions, targets)
     res = np.apply_along_axis(all, 1, (pred == targ)).astype(np.float)
     res = res.sum() / res.size
+    res = np.nan_to_num(res)
     return res
 
 
@@ -30,6 +31,7 @@ def accuracy_classes(predictions, targets):
 
     res = (pred == targ).sum(0).float()
     res = res / pred.shape[0]
+    res = np.nan_to_num(res)
     return res
 
 
@@ -43,6 +45,7 @@ def sensitivity_classes(predictions, targets):
     #FP = ((targ == 0) * (pred == 1)).sum(0)
     #SFN = ((targ == 1) * (pred == 0)).sum(0)
     res = TP / P
+    res = np.nan_to_num(res)
     return res
 
 
@@ -52,6 +55,7 @@ def specificity_classes(predictions, targets):
     N = (targ == 0).sum(0).float()
     TN = ((targ == 0) * (pred == 0)).sum(0).float()
     res = TN / N
+    res = np.nan_to_num(res)
     return res
 
 
@@ -61,6 +65,7 @@ def precision_classes(predictions, targets):
     TP = ((targ == 1) * (pred == 1)).sum(0).float()
     FP = ((targ == 0) * (pred == 1)).sum(0).float()
     res = TP / (TP + FP)
+    res = np.nan_to_num(res)
     return res
 
 
@@ -71,6 +76,7 @@ def f1_score_classes(predictions, targets):
     TP = ((targ == 1) * (pred == 1)).sum(0).float()
     FP = ((targ == 0) * (pred == 1)).sum(0).float()
     res = 2 * TP / (TP + FP + P)
+    res = np.nan_to_num(res)
     return res
 
 
@@ -83,6 +89,7 @@ def roc_auc_classes(predictions, targets):
             res[ii] = sklearn.metrics.roc_auc_score(targ[:, ii], pred[:, ii])
         except ValueError:
             res[ii] = 0
+    res = np.nan_to_num(res)
     return res
 
 
@@ -92,6 +99,7 @@ def roc_auc_all(predictions, targets):
         res = sklearn.metrics.roc_auc_score(targ, pred)
     except ValueError:
         res = np.zeros((pred.shape[0]))
+    res = np.nan_to_num(res)
     return res
 
 
@@ -104,6 +112,7 @@ def average_precision_score_classes(predictions, targets):
             res[ii] = sklearn.metrics.average_precision_score(targ[:, ii], pred[:, ii])
         except ValueError:
             res[ii] = 0
+    res = np.nan_to_num(res)
     return res
 
 
@@ -137,7 +146,7 @@ def segmentation_accuracy(predictions, targets):
     #FP = ((targets == 0) * (predictions == 1)).reshape(n, -1).sum(1)
     #FN = ((targets == 1) * (predictions == 0)).reshape(n, -1).sum(1)
     res = (TP + TN) / (P + N)
-
+    res = np.nan_to_num(res)
     return res
 
 
@@ -160,7 +169,7 @@ def segmentation_iou(predictions, targets):
     TP = ((targets == 1) * (predictions == 1)).reshape(n, -1).sum(1)
     FP = ((targets == 0) * (predictions == 1)).reshape(n, -1).sum(1)
     res = TP / (P + FP)
-
+    res = np.nan_to_num(res)
     return res
 
 
@@ -190,7 +199,7 @@ def segmentation_precision(predictions, targets):
     TP = ((targets == 1) * (predictions == 1)).reshape(n, -1).sum(1)
     FP = ((targets == 0) * (predictions == 1)).reshape(n, -1).sum(1)
     res = TP / (TP + FP)
-
+    res = np.nan_to_num(res)
     return res
 
 
@@ -220,7 +229,7 @@ def segmentation_recall(predictions, targets):
     TP = ((targets == 1) * (predictions == 1)).reshape(n, -1).sum(1)
     FN = ((targets == 1) * (predictions == 0)).reshape(n, -1).sum(1)
     res = TP / (TP + FN)
-
+    res = np.nan_to_num(res)
     return res
 
 
@@ -250,7 +259,7 @@ def segmentation_specificity(predictions, targets):
     TN = ((targets == 0) * (predictions == 0)).reshape(n, -1).sum(1)
     FP = ((targets == 0) * (predictions == 1)).reshape(n, -1).sum(1)
     res = TN / (TN + FP)
-
+    res = np.nan_to_num(res)
     return res
 
 
@@ -273,7 +282,7 @@ def segmentation_dice(predictions, targets):
     FP = ((targets == 0) * (predictions == 1)).reshape(n, -1).sum(1)
     FN = ((targets == 1) * (predictions == 0)).reshape(n, -1).sum(1)
     res = 2 * TP / (2 * TP + FN + FP)
-
+    res = np.nan_to_num(res)
     return res
 
 

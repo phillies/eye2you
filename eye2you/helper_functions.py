@@ -14,21 +14,28 @@ from PIL import Image
 IMG_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tiff')
 
 
-def pil_loader(path, mode='RGB'):
-    """load an image using PIL/Pillow
+def pil_loader(path, mode=None):
+    img = Image.open(path)
+    if mode is None:
+        return img
+    return img.convert(mode)
 
-    Arguments:
-        path {str} -- file name (and path)
 
-    Keyword Arguments:
-        mode {str} -- Convert the image to given mode (default: {'RGB'})
+# def pil_loader(path, mode='RGB'):
+#     """load an image using PIL/Pillow
 
-    Returns:
-        PIL.Image.Image -- Converted PIL Image
-    """
-    with open(path, 'rb') as f:
-        img = Image.open(f)
-        return img.convert(mode)
+#     Arguments:
+#         path {str} -- file name (and path)
+
+#     Keyword Arguments:
+#         mode {str} -- Convert the image to given mode (default: {'RGB'})
+
+#     Returns:
+#         PIL.Image.Image -- Converted PIL Image
+#     """
+#     with open(path, 'rb') as f:
+#         img = Image.open(f)
+#         return img.convert(mode)
 
 
 def get_images(directory, extensions=IMG_EXTENSIONS):
@@ -194,8 +201,8 @@ def split_tensor_image_into_patches(img, patch_size):
     out = torch.zeros((n_x * n_y, c, patch_size, patch_size))
     for ii in range(n_y):
         for jj in range(n_x):
-            out[ii * n_x + jj, :, :, :] = img[:, ii * patch_size:(ii + 1) * patch_size, jj * patch_size:(jj + 1) *
-                                              patch_size]
+            out[ii * n_x +
+                jj, :, :, :] = img[:, ii * patch_size:(ii + 1) * patch_size, jj * patch_size:(jj + 1) * patch_size]
     return out
 
 
@@ -327,13 +334,14 @@ def parallel_variance(mean_a, count_a, var_a, mean_b, count_b, var_b):
     M2 = m_a + m_b + delta**2 * count_a * count_b / (count_a + count_b)
     return M2 / (count_a + count_b - 1)
 
+
 def calculate_mean_and_std(samples):
-    img = imageio.imread(samples[0])/255.
+    img = imageio.imread(samples[0]) / 255.
     mean_a = img.reshape(-1, 3).mean(0)
     var_a = img.reshape(-1, 3).var(0)
     count_a = img.shape[0] * img.shape[1]
     for s in tqdm.tqdm(samples[1:]):
-        img = imageio.imread(s)/255.
+        img = imageio.imread(s) / 255.
         mean_b = img.reshape(-1, 3).mean(0)
         var_b = img.reshape(-1, 3).var(0)
         count_b = img.shape[0] * img.shape[1]
@@ -384,11 +392,13 @@ def loader_to_images(loader, prefix=None, max_counter=None, segment=False, mask=
         if counter >= max_counter:
             break
 
+
 def save_as_image(source, filename):
     nrow = int(np.ceil(np.sqrt(source.shape[0])))
     grid = torchvision.utils.make_grid(source, nrow=nrow)
     img = torchvision.transforms.ToPILImage()(grid)
     img.save(filename)
+
 
 def visualize_iou(output, target, colormap=((0, 0, 0), (1, 1, 1), (1, 0, 0), (0, 1, 1))):
     if output.shape[1] == 2:
@@ -472,6 +482,7 @@ def denoise(img, ksize=(5, 5), morph=cv2.MORPH_RECT):
     img = cv2.morphologyEx(img, cv2.MORPH_OPEN, kernel)
     return img
 
+
 def find_retina_boxes(im,
                       display=False,
                       dp=1.0,
@@ -528,14 +539,15 @@ def find_retina_boxes(im,
 
     # detect circles in the image
     try:
-        circles = cv2.HoughCircles(gray,
-                                   cv2.HOUGH_GRADIENT,
-                                   dp=dp,
-                                   minDist=minDist,
-                                   param1=param1,
-                                   param2=param2,
-                                   minRadius=minRadius,
-                                   maxRadius=maxRadius)
+        circles = cv2.HoughCircles(
+            gray,
+            cv2.HOUGH_GRADIENT,
+            dp=dp,
+            minDist=minDist,
+            param1=param1,
+            param2=param2,
+            minRadius=minRadius,
+            maxRadius=maxRadius)
     except Exception as e:
         print('Something bad happened:', e)
         return None
@@ -580,29 +592,31 @@ def find_retina_boxes(im,
         if param1 > param1_limit:
             param1 -= abs(param1_step)
             print('Retry with param1=', param1)
-            return find_retina_boxes(im,
-                                     display,
-                                     dp=dp,
-                                     param1=param1,
-                                     param2=param2,
-                                     minimum_circle_distance=minimum_circle_distance,
-                                     minimum_radius=minimum_radius,
-                                     maximum_radius=maximum_radius,
-                                     max_patch_size=max_patch_size,
-                                     max_distance_center=max_distance_center)
+            return find_retina_boxes(
+                im,
+                display,
+                dp=dp,
+                param1=param1,
+                param2=param2,
+                minimum_circle_distance=minimum_circle_distance,
+                minimum_radius=minimum_radius,
+                maximum_radius=maximum_radius,
+                max_patch_size=max_patch_size,
+                max_distance_center=max_distance_center)
         elif param2 > param2_limit:
             param2 -= abs(param2_step)
             print('Retry with param2=', param2)
-            return find_retina_boxes(im,
-                                     display,
-                                     dp=dp,
-                                     param1=param1,
-                                     param2=param2,
-                                     minimum_circle_distance=minimum_circle_distance,
-                                     minimum_radius=minimum_radius,
-                                     maximum_radius=maximum_radius,
-                                     max_patch_size=max_patch_size,
-                                     max_distance_center=max_distance_center)
+            return find_retina_boxes(
+                im,
+                display,
+                dp=dp,
+                param1=param1,
+                param2=param2,
+                minimum_circle_distance=minimum_circle_distance,
+                minimum_radius=minimum_radius,
+                maximum_radius=maximum_radius,
+                max_patch_size=max_patch_size,
+                max_distance_center=max_distance_center)
         else:
             print('no luck, skipping image')
 
@@ -613,12 +627,13 @@ def get_retina_mask(img, **kwargs):
     mask = np.zeros((img.shape[:2]), dtype=np.uint8)
     circle = find_retina_boxes(img, display=False, **kwargs)
     if circle is None:
-        return mask+1
+        return mask + 1
     x, y, _, r_out, _ = circle
 
-    cv2.circle(mask, (x, y), r_out-1, (255), cv2.FILLED)
+    cv2.circle(mask, (x, y), r_out - 1, (255), cv2.FILLED)
 
     return mask
+
 
 def denormalize_transform(trans):
     for t in trans.transforms:
@@ -632,6 +647,7 @@ def denormalize(normalize):
     mean = np.array(normalize.mean) * -1 * std
     denorm = torchvision.transforms.Normalize(mean=mean, std=std)
     return denorm
+
 
 def denormalize_mean_std(mean, std):
     denorm_std = 1 / np.array(std)

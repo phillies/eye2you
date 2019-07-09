@@ -1,12 +1,21 @@
+import sys
 import copy
 import warnings
 
 import torch.nn as nn
 import torch.optim
-import tqdm
 
 from . import models
+if 'IPython' in sys.modules:
 
+    from IPython import get_ipython
+
+    if 'IPKernelApp' in get_ipython().config:
+        from tqdm import tqdm_notebook as tqdm
+    else:
+        from tqdm import tqdm
+else:
+    from tqdm import tqdm
 
 class Network():
 
@@ -126,7 +135,7 @@ class Network():
         for perf_meter in self.performance_meters:
             perf_meter.reset()
 
-        pbar = tqdm.tqdm(total=num_batches, leave=False, desc='Train', position=position)
+        pbar = tqdm(total=num_batches, leave=False, desc='Train', position=position)
         for source, target in loader:
             if isinstance(source, (tuple, list)):
                 source = [v.to(self.device) for v in source]
@@ -171,7 +180,7 @@ class Network():
             perf_meter.reset()
 
         with torch.no_grad():
-            pbar = tqdm.tqdm(total=num_batches, leave=False, desc='Validate', position=position)
+            pbar = tqdm(total=num_batches, leave=False, desc='Validate', position=position)
             for source, target in loader:
                 if isinstance(source, (tuple, list)):
                     source = [v.to(self.device) for v in source]

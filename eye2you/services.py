@@ -1,12 +1,23 @@
+import sys
 import cv2
 import numpy as np
 import torch
 from PIL import Image
-import tqdm
 
 from .net import Network
 from .helper_functions import cv2_to_PIL, torch_to_PIL
 from . import datasets
+
+if 'IPython' in sys.modules:
+
+    from IPython import get_ipython
+
+    if 'IPKernelApp' in get_ipython().config:
+        from tqdm import tqdm_notebook as tqdm
+    else:
+        from tqdm import tqdm
+else:
+    from tqdm import tqdm
 
 FEATURE_BLOBS = []
 
@@ -102,7 +113,7 @@ class SimpleService(BaseService):
 
     def classify_all(self, filenames):
         outputs = []
-        for fname in tqdm.tqdm(filenames, desc='Files', position=0):
+        for fname in tqdm(filenames, desc='Files', position=0):
             img = Image.open(fname)
             outputs.append(self.analyze_image(img))
         return torch.stack(outputs, dim=0)

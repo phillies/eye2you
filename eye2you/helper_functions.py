@@ -6,8 +6,17 @@ import imageio
 import numpy as np
 import torch
 import torchvision
-import tqdm
 from PIL import Image
+if 'IPython' in sys.modules:
+
+    from IPython import get_ipython
+
+    if 'IPKernelApp' in get_ipython().config:
+        from tqdm import tqdm_notebook as tqdm
+    else:
+        from tqdm import tqdm
+else:
+    from tqdm import tqdm
 
 # Functions partially copied from torchvision
 
@@ -340,7 +349,7 @@ def calculate_mean_and_std(samples):
     mean_a = img.reshape(-1, 3).mean(0)
     var_a = img.reshape(-1, 3).var(0)
     count_a = img.shape[0] * img.shape[1]
-    for s in tqdm.tqdm(samples[1:]):
+    for s in tqdm(samples[1:]):
         img = imageio.imread(s) / 255.
         mean_b = img.reshape(-1, 3).mean(0)
         var_b = img.reshape(-1, 3).var(0)
@@ -462,7 +471,7 @@ def sliding_window_vessel(model, img, patch_size, stride=1, minimum_matches=0, d
     n_w = int((w - p_w) / s_w) + 1
 
     vessel = torch.zeros((1, h, w)) - minimum_matches
-    with tqdm.tqdm(total=(n_h * n_w), desc='Vessel detection', unit='patch') as pb:
+    with tqdm(total=(n_h * n_w), desc='Vessel detection', unit='patch') as pb:
         for ii in range(n_h):
             for jj in range(n_w):
                 x_cuda = img[:, ii * s_h:ii * s_h + p_h, jj * s_w:jj * s_w + p_w].to(device).unsqueeze(0)

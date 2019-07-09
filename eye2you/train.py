@@ -1,13 +1,24 @@
+import sys
+
 import numpy as np
 import pandas as pd
 import torch
 import torchvision.transforms as transforms
-import tqdm
 import yaml
 from sklearn.linear_model import LinearRegression
 
 from . import datasets, factory
 from .net import Network
+
+if 'IPython' in sys.modules:
+    from IPython import get_ipython
+
+    if 'IPKernelApp' in get_ipython().config:
+        from tqdm import tqdm_notebook as tqdm
+    else:
+        from tqdm import tqdm
+else:
+    from tqdm import tqdm
 
 
 class Logger():
@@ -144,16 +155,16 @@ class Coach():
             early_stop_criterion='loss',
             early_stop_slope=0.0):
         #TODO: add error message if model is not set up completely
-        pbar = tqdm.tqdm(total=num_epochs, desc='Epoch', position=0)
-        log_title = tqdm.tqdm(total=0, desc='Criteria', position=2, bar_format='{desc}')
+        pbar = tqdm(total=num_epochs, desc='Epoch', position=0)
+        log_title = tqdm(total=0, desc='Criteria', position=2, bar_format='{desc}')
         log_title.set_description_str(
             ('Performance meter: ' + ' {:>8.8}' * (1 + len(self.net.performance_meters))).format(
                 'loss', *[p.__str__() for p in self.net.performance_meters]))
 
-        log_train = tqdm.tqdm(total=0, desc='Training results', position=3, bar_format='{desc}')
-        log_val = tqdm.tqdm(total=0, desc='Validation results', position=4, bar_format='{desc}')
-        log_best = tqdm.tqdm(total=0, desc='Validation best', position=5, bar_format='{desc}')
-        log_slope = tqdm.tqdm(total=0, desc='Validation slope', position=6, bar_format='{desc}')
+        log_train = tqdm(total=0, desc='Training results', position=3, bar_format='{desc}')
+        log_val = tqdm(total=0, desc='Validation results', position=4, bar_format='{desc}')
+        log_best = tqdm(total=0, desc='Validation best', position=5, bar_format='{desc}')
+        log_slope = tqdm(total=0, desc='Validation slope', position=6, bar_format='{desc}')
         for _ in range(num_epochs):
             train_results = self.net.train(self.train_loader, position=1)
             validate_results = self.net.validate(self.validate_loader, position=1)
